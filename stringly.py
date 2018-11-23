@@ -77,7 +77,7 @@ class struct(metaclass=structmeta):
   def __str__(self):
     return ','.join('{}={}'.format(key, protect(str(getattr(self, key)), ',')) for key in self.__class__.defaults)
 
-class clstuplemeta(type):
+class tuplemeta(type):
   def __new__(*args, **types):
     cls = type.__new__(*args)
     cls.types = types
@@ -87,7 +87,7 @@ class clstuplemeta(type):
   def __call__(cls, *args, **types):
     if cls is tuple:
       name = '<tuple of {}>'.format(', '.join(types))
-      return clstuplemeta(name, (tuple,), {}, **types)(*args)
+      return tuplemeta(name, (tuple,), {}, **types)(*args)
     assert not types and len(args) <= 1
     items = args and args[0]
     if isinstance(items, str):
@@ -97,7 +97,7 @@ class clstuplemeta(type):
     self.__init__()
     return self
 
-class tuple(builtins.tuple, metaclass=clstuplemeta, types=()):
+class tuple(builtins.tuple, metaclass=tuplemeta, types=()):
   def __str__(self):
     clsname = {cls: name for name, cls in self.__class__.types.items()}
     return ','.join('{}:{}'.format(clsname[item.__class__], protect(str(item), ',')) for item in self)
