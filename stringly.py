@@ -111,7 +111,11 @@ def unprotect(s):
 class structmeta(type):
   def __new__(*args, **defaults):
     cls = type.__new__(*args)
-    cls.defaults = defaults
+    if hasattr(cls, 'defaults'):
+      cls.defaults = cls.defaults.copy()
+      cls.defaults.update(defaults)
+    else:
+      cls.defaults = defaults
     return cls
   def __init__(*args, **defaults):
     type.__init__(*args)
