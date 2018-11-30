@@ -35,13 +35,78 @@ def safesplit(s, sep):
     level += part.count('{') - part.count('}')
   return parts
 
-def protect(part, c):
-  levels = numpy.cumsum([s.count('{') - s.count('}') for s in part.split(c)])
-  assert levels[-1] == 0 and min(levels) == 0
-  return '{' + part + '}' if 0 in levels[:-1] else part
+def isnormal(s):
+  'cheap algorithm to detect strings for which escape is an identity'
+  depth = 0
+  for part in s.split('{'):
+    if depth == 1 and part.startswith('}'): # empty scope at level 0 requires escaping
+      return False
+    depth -= part.count('}')
+    if depth < 0: # negative scope requires escaping
+      return False
+    depth += 1
+  return depth == 1
 
-def unprotect(part):
-  return part[1:-1] if part.startswith('{') and part.endswith('}') else part
+def escape(s):
+  'convert to a string with balanced braces and all non-brace characters in non-negative scope'
+  if isnormal(s):
+    return s
+  disbalance = s.count('{') - s.count('}')
+  depth = 0
+  escaped = ''
+  for c in s:
+    if disbalance and depth == 0 and c == '{}'[disbalance<0]:
+      c += '{}'[disbalance>0] # escape brace
+      disbalance += 1 if disbalance<0 else -1 # reduce disbalance
+    elif c == '{':
+      depth += 1
+      if depth <= 0:
+        c = '{}' # escape opening brace
+    elif c == '}':
+      depth -= 1
+      if depth < 0:
+        c = '}{' # escape closing brace
+      elif depth == 0 and escaped[-1] == '{': # empty scope at level 0
+        c = '}}{' # escape existing opening brace and new closing brace
+    escaped += c
+  assert depth == disbalance == 0
+  return escaped
+
+def unescape(escaped):
+  'inverse operation to escape'
+  if isnormal(escaped):
+    return escaped
+  depth = 0
+  s = ''
+  for c in escaped:
+    if c == '{':
+      depth += 1
+      if depth == 0 and s[-1] == '}':
+        continue
+    elif c == '}':
+      depth -= 1
+      if depth == 0 and s[-1] == '{':
+        continue
+    else:
+      assert depth >= 0, 'source string is not positive'
+    s += c
+  assert depth == 0, 'source string is not balanced'
+  return s
+
+def protect(s, c):
+  if not isnormal(s):
+    return '{' + escape(s) + '}' # always embrace escaped strings to make them normal
+  if s.startswith('{') and s.endswith('}'):
+    return '{' + s + '}'
+  n = 0
+  for part in s.split(c)[:-1]:
+    n += part.count('{') - part.count('}')
+    if not n:
+      return '{' + s + '}'
+  return s
+
+def unprotect(s):
+  return unescape(s[1:-1] if s.startswith('{') and s.endswith('}') else s)
 
 class structmeta(type):
   def __new__(*args, **defaults):
@@ -77,7 +142,7 @@ class struct(metaclass=structmeta):
   def __str__(self):
     return ','.join('{}={}'.format(key, protect(str(getattr(self, key)), ',')) for key in self.__class__.defaults)
 
-class clstuplemeta(type):
+class tuplemeta(type):
   def __new__(*args, **types):
     cls = type.__new__(*args)
     cls.types = types
@@ -87,7 +152,7 @@ class clstuplemeta(type):
   def __call__(cls, *args, **types):
     if cls is tuple:
       name = '<tuple of {}>'.format(', '.join(types))
-      return clstuplemeta(name, (tuple,), {}, **types)(*args)
+      return tuplemeta(name, (tuple,), {}, **types)(*args)
     assert not types and len(args) <= 1
     items = args and args[0]
     if isinstance(items, str):
@@ -97,7 +162,7 @@ class clstuplemeta(type):
     self.__init__()
     return self
 
-class tuple(builtins.tuple, metaclass=clstuplemeta, types=()):
+class tuple(builtins.tuple, metaclass=tuplemeta, types=()):
   def __str__(self):
     clsname = {cls: name for name, cls in self.__class__.types.items()}
     return ','.join('{}:{}'.format(clsname[item.__class__], protect(str(item), ',')) for item in self)
