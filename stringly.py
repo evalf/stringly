@@ -20,7 +20,7 @@
 
 version = '1.0b0'
 
-import builtins
+import builtins, inspect, collections
 
 def safesplit(s, sep):
   if not s:
@@ -167,3 +167,57 @@ class tuple(builtins.tuple, metaclass=tuplemeta, types=()):
   def __str__(self):
     clsname = {cls: name for name, cls in self.__class__.types.items()}
     return ','.join('{}:{}'.format(clsname[item.__class__], protect(item, ',')) for item in self)
+
+class boolmeta(type):
+  def __instancecheck__(cls, other):
+    return isinstance(other, builtins.bool)
+  def __call__(cls, s):
+    if s.lower() in ('true', 'yes'):
+      return True
+    elif s.lower() in ('false', 'no'):
+      return False
+    else:
+      raise Exception('invalid boolean value {!r}'.format(s))
+
+class bool(metaclass=boolmeta):
+  __str__ = bool.__str__
+
+class ImmutableMeta(type):
+  def __init__(cls, *args):
+    super().__init__(*args)
+    _self, *params = inspect.signature(cls.__init__).parameters.values()
+    cls._types = collections.OrderedDict()
+    for param in params:
+      if param.kind == param.POSITIONAL_ONLY:
+        raise Exception('positional-only constructor argument in {}: {!r}'.format(cls.__name__, param.name))
+      if param.annotation is not param.empty and callable(param.annotation):
+        T = param.annotation
+      elif param.default is not param.empty:
+        T = param.default.__class__ if not isinstance(param.default, bool) else bool
+      else:
+        raise Exception('{} constructor argument without default or annotation: {!r}'.format(cls.__name__, param.name))
+      cls._types[param.name] = T
+  def __call__(*cls_args, **kwargs):
+    cls, *args = cls_args
+    if not args:
+      _str = ','.join('{}={}'.format(name, protect(T.__str__(kwargs[name]), ',')) for name, T in cls._types.items() if name in kwargs)
+    elif len(args) == 1 and not kwargs:
+      _str, = args
+      for arg in safesplit(_str, ','):
+        key, sep, val = arg.partition('=')
+        T = cls._types.get(key)
+        if not T:
+          raise TypeError('unexpected keyword argument {!r}'.format(key))
+        kwargs[key] = T(unprotect(val))
+    else:
+      raise Exception('{} expects either keyword arguments or a single positional string'.format(cls.__name__))
+    self = cls.__new__(cls)
+    self._str = _str # first set string representation in case the constructor hits an exception
+    self.__init__(**kwargs)
+    return self
+
+class Immutable(metaclass=ImmutableMeta):
+  def __init__(self):
+    raise Exception('Immutable base class cannot be instantiated')
+  def __str__(self):
+    return self._str

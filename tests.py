@@ -59,3 +59,34 @@ class Protect(unittest.TestCase):
     self.assertProtected('}abc{', '{}{abc{}}')
     self.assertProtected('}abc', '{}{abc}')
     self.assertProtected('abc{', '{abc{}}')
+
+class Immutable(unittest.TestCase):
+
+  class A(stringly.Immutable):
+    def __init__(self, i:int, f=2.5, b=True):
+      self.i = i
+      self.f = f
+      self.b = b
+
+  def check(self, a, i, f, b):
+    self.assertIsInstance(a.i, int)
+    self.assertEqual(a.i, i)
+    self.assertIsInstance(a.f, float)
+    self.assertEqual(a.f, f)
+    self.assertIsInstance(a.b, bool)
+    self.assertEqual(a.b, b)
+
+  def test_keywordargs(self):
+    a = self.A(i=5, f=10., b=False)
+    self.check(a, 5, 10., False)
+    self.assertEqual(str(a), 'i=5,f=10.0,b=False')
+
+  def test_stringarg(self):
+    a = self.A('f=10,i=5,b=no')
+    self.check(a, 5, 10., False)
+    self.assertEqual(str(a), 'f=10,i=5,b=no')
+
+  def test_partialstringarg(self):
+    a = self.A('i=1')
+    self.check(a, 1, 2.5, True)
+    self.assertEqual(str(a), 'i=1')
