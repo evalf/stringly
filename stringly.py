@@ -109,12 +109,6 @@ def unprotect(s):
   return unescape(s[1:-1] if s.startswith('{') and s.endswith('}') else s)
 
 class structmeta(type):
-  def __new__(*args, **defaults):
-    cls = type.__new__(*args)
-    cls.defaults = defaults
-    return cls
-  def __init__(*args, **defaults):
-    type.__init__(*args)
   def __call__(cls, *args, **kwargs):
     if args:
       assert len(args) == 1 and not kwargs
@@ -124,23 +118,19 @@ class structmeta(type):
     if cls is struct:
       # direct invocation of struct returns an automatically generated subtype
       name = '<struct of {}>'.format(', '.join(kwargs))
-      return structmeta(name, (cls,), {}, **kwargs)()
+      return structmeta(name, (cls,), kwargs)()
     self = object.__new__(cls)
-    self.__dict__.update(cls.defaults)
     for key, val in kwargs.items():
-      try:
-        defcls = cls.defaults[key].__class__
-      except KeyError:
+      if key.startswith('_') or not hasattr(cls, key):
         raise TypeError('unexpected keyword argument {!r}'.format(key))
-      if not isinstance(val, defcls):
-        val = defcls(val)
-      self.__dict__[key] = val
+      defcls = getattr(cls, key).__class__
+      setattr(self, key, val if isinstance(val, defcls) else defcls(val))
     self.__init__()
     return self
 
 class struct(metaclass=structmeta):
   def __str__(self):
-    return ','.join('{}={}'.format(key, protect(str(getattr(self, key)), ',')) for key in self.__class__.defaults)
+    return ','.join('{}={}'.format(key, protect(str(getattr(self, key)), ',')) for key in dir(self.__class__) if not key.startswith('_'))
 
 class tuplemeta(type):
   def __new__(*args, **types):
