@@ -159,3 +159,22 @@ class InlineStruct(Struct):
 
   def test_instance(self):
     self.check(self.s, a='foo', b=2.5)
+
+class Choice(unittest.TestCase):
+
+  c = stringly.choice(a=float, b=2)
+
+  def check(self, c, expect):
+    self.assertEqual(c, expect)
+    self.assertIsInstance(c, expect.__class__)
+
+  def test_objarg(self):
+    self.check(self.c('b'), 2)
+
+  def test_typeargstring(self):
+    self.check(self.c('a:2.5'), 2.5)
+
+  def test_string(self):
+    self.assertEqual(str(self.c), 'a|b')
+    self.assertEqual(self.c.__str__(1.), 'a:1.0')
+    self.assertEqual(self.c.__str__(2), 'b')

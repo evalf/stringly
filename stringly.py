@@ -225,3 +225,26 @@ class Immutable(metaclass=ImmutableMeta):
     raise Exception('Immutable base class cannot be instantiated')
   def __str__(self):
     return self._str
+
+class choice:
+  def __init__(self, **options):
+    self.options = options
+  def __call__(self, s):
+    assert isinstance(s, str)
+    key, sep, tail = s.partition(':')
+    value = self.options[key]
+    if isinstance(value, type):
+      value = value(tail)
+    else:
+      assert not sep
+    return value
+  def __str__(self, *args):
+    if not args:
+      return '|'.join(sorted(self.options))
+    arg, = args
+    for key, val in self.options.items():
+      if val == arg:
+        return key
+      if isinstance(val, type) and isinstance(arg, val):
+        return '{}:{}'.format(key, arg)
+    raise Exception('unrecognized object {!r}'.format(arg))
