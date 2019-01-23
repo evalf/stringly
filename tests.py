@@ -90,3 +90,36 @@ class Immutable(unittest.TestCase):
     a = self.A('i=1')
     self.check(a, 1, 2.5, True)
     self.assertEqual(str(a), 'i=1')
+
+class Tuple(unittest.TestCase):
+
+  class T(stringly.tuple, a=str, b=float):
+    pass
+
+  def check(self, t, *values):
+    self.assertEqual(len(t), len(values))
+    for i, v in enumerate(values):
+      self.assertEqual(t[i], v)
+      self.assertIsInstance(t[i], v.__class__)
+
+  def test_defaults(self):
+    self.check(self.T())
+
+  def test_stringarg(self):
+    self.check(self.T('b:1,a:2'), 1., '2')
+
+  def test_directarg(self):
+    self.check(self.T([1., '2']), 1., '2')
+
+  def test_string(self):
+    self.assertEqual(str(self.T()), '')
+    self.assertEqual(str(self.T([1., '2'])), 'b:1.0,a:2')
+    self.assertEqual(str(self.T('a:1,b:2')), 'a:1,b:2.0')
+
+class InlineTuple(Tuple):
+
+  t = stringly.tuple.inline('b:2', a=str, b=float)
+  T = t.__class__
+
+  def test_instance(self):
+    self.check(self.t, 2.)

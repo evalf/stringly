@@ -150,11 +150,9 @@ class tuplemeta(type):
     return cls
   def __init__(*args, **types):
     type.__init__(*args)
-  def __call__(cls, *args, **types):
-    if cls is tuple:
-      name = '<tuple of {}>'.format(', '.join(types))
-      return tuplemeta(name, (tuple,), {}, **types)(*args)
-    assert not types and len(args) <= 1
+  def __call__(cls, *args):
+    assert cls is not tuple
+    assert len(args) <= 1
     items = args and args[0]
     if isinstance(items, str):
       split = [item.partition(':')[::2] for item in safesplit(items, ',')]
@@ -163,10 +161,14 @@ class tuplemeta(type):
     self.__init__()
     return self
 
-class tuple(builtins.tuple, metaclass=tuplemeta, types=()):
+class tuple(builtins.tuple, metaclass=tuplemeta):
   def __str__(self):
     clsname = {cls: name for name, cls in self.__class__.types.items()}
     return ','.join('{}:{}'.format(clsname[item.__class__], protect(item, ',')) for item in self)
+  @classmethod
+  def inline(*cls_args, **types):
+    cls, *args = cls_args
+    return tuplemeta('<inline tuple>', (cls,), {}, **types)(*args)
 
 class boolmeta(type):
   def __instancecheck__(cls, other):
