@@ -123,3 +123,39 @@ class InlineTuple(Tuple):
 
   def test_instance(self):
     self.check(self.t, 2.)
+
+class Struct(unittest.TestCase):
+
+  class S(stringly.struct, a='foo', b=2.5):
+    pass
+
+  def check(self, s, a, b):
+    self.assertIsInstance(s.a, str)
+    self.assertEqual(s.a, a)
+    self.assertIsInstance(s.b, float)
+    self.assertEqual(s.b, b)
+
+  def test_defaults(self):
+    self.check(self.S(), a='foo', b=2.5)
+
+  def test_stringarg(self):
+    self.check(self.S('a=1,b=2'), a='1', b=2.)
+
+  def test_directarg(self):
+    self.check(self.S(a=1, b=2), a='1', b=2.)
+
+  def test_mixedarg(self):
+    self.check(self.S('a=1', b=2), a='1', b=2.)
+
+  def test_string(self):
+    self.assertEqual(str(self.S()), 'a=foo,b=2.5')
+    self.assertEqual(str(self.S(a=1)), 'a=1,b=2.5')
+    self.assertEqual(str(self.S(b=2)), 'a=foo,b=2.0')
+
+class InlineStruct(Struct):
+
+  s = stringly.struct.inline(a='foo', b=2.5)
+  S = s.__class__
+
+  def test_instance(self):
+    self.check(self.s, a='foo', b=2.5)

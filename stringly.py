@@ -117,22 +117,21 @@ class structmeta(type):
   def __init__(*args, **defaults):
     type.__init__(*args)
   def __call__(cls, *args, **kwargs):
+    assert cls is not struct
     if args:
-      assert len(args) == 1 and not kwargs
+      assert len(args) == 1
       for arg in safesplit(args[0], ','):
         key, sep, val = arg.partition('=')
+        if key in kwargs:
+          raise Exception('duplicate key {!r}'.format(key))
         kwargs[key] = unprotect(val)
-    if cls is struct:
-      # direct invocation of struct returns an automatically generated subtype
-      name = '<struct of {}>'.format(', '.join(kwargs))
-      return structmeta(name, (cls,), {}, **kwargs)()
     self = object.__new__(cls)
     self.__dict__.update(cls.defaults)
     for key, val in kwargs.items():
       try:
         defcls = cls.defaults[key].__class__
-      except KeyError:
-        raise TypeError('unexpected keyword argument {!r}'.format(key))
+      except KeyError as e:
+        raise TypeError('unexpected keyword argument {!r}'.format(key)) from e
       if not isinstance(val, defcls):
         val = defcls(val)
       self.__dict__[key] = val
@@ -142,6 +141,9 @@ class structmeta(type):
 class struct(metaclass=structmeta):
   def __str__(self):
     return ','.join('{}={}'.format(key, protect(getattr(self, key), ',')) for key in self.__class__.defaults)
+  @classmethod
+  def inline(cls, **kwargs):
+    return structmeta('<inline struct>', (cls,), {}, **kwargs)()
 
 class tuplemeta(type):
   def __new__(*args, **types):
