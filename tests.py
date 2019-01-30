@@ -178,3 +178,37 @@ class Choice(unittest.TestCase):
     self.assertEqual(str(self.c), 'a|b')
     self.assertEqual(self.c.__str__(1.), 'a:1.0')
     self.assertEqual(self.c.__str__(2), 'b')
+
+class Unit(unittest.TestCase):
+
+  U = stringly.create_unit(m=1, s=1, g=1e-3, N='kg*m/s2', Pa='N/m2', lb='453.59237g', h='3600s', **{'in': '.0254m'})
+
+  def check(self, *args, **powers):
+    s, v = args
+    u = self.U(s)
+    self.assertEqual(u, v)
+    self.assertEqual(u.__class__._powers, powers)
+
+  def test_length(self):
+    self.check('m', 1, m=1)
+    self.check('10in', .254, m=1)
+
+  def test_mass(self):
+    self.check('kg', 1, g=1)
+    self.check('1lb', .45359237, g=1)
+
+  def test_time(self):
+    self.check('s', 1, s=1)
+    self.check('.5h', 1800, s=1)
+
+  def test_velocity(self):
+    self.check('m/s', 1, m=1, s=-1)
+    self.check('km/h', 1/3.6, m=1, s=-1)
+
+  def test_force(self):
+    self.check('N', 1, g=1, m=1, s=-2)
+    self.check('100Pa*in2', .254**2, g=1, m=1, s=-2)
+
+  def test_pressure(self):
+    self.check('Pa', 1, g=1, m=-1, s=-2)
+    self.check('10000lb/in/h2', 453.59237/25.4/36**2, g=1, m=-1, s=-2)

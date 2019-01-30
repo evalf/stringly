@@ -248,3 +248,64 @@ class choice:
       if isinstance(val, type) and isinstance(arg, val):
         return '{}:{}'.format(key, arg)
     raise Exception('unrecognized object {!r}'.format(arg))
+
+def _findfirst(iterable, items, complement=False):
+  for index, item in enumerate(iterable):
+    if (item in items)^complement:
+      return index
+  return len(iterable)
+
+def _parse_unit(s, units, modifiers=dict(p=1e-9, μ=1e-6, m=1e-3, k=1e3, M=1e6, G=1e9)):
+  i = _findfirst(s, '0123456789.', complement=True)
+  value = float(s[:i] or 1)
+  u = s[i:]
+  powers = {}
+  for mul in u.split('*'):
+    s = +1
+    for div in mul.split('/'):
+      i = _findfirst(div, '0123456789')
+      s *= int(div[i:] or 1)
+      if div[:i] in units:
+        v, p = units[div[:i]]
+      else:
+        v, p = units[div[1:i]]
+        v *= modifiers[div[0]]
+      value *= v**s
+      for c, n in p.items():
+        n = powers.pop(c, 0) + n * s
+        if n:
+          powers[c] = n
+      s = -1
+  return value, powers
+
+class Unit(float):
+  __slots__ = ()
+  def __new__(cls, s):
+    v, powers = _parse_unit(s, cls._units)
+    if hasattr(cls, '_powers'):
+      assert cls._powers == powers, 'invalid unit: expected {}, got {}'.format(cls._powers, powers)
+    else:
+      cls = type('Unit:' + ''.join(str(s) for item in powers.items() for s in item), (cls,), dict(__slots__='_str', _powers=powers))
+    self = float.__new__(cls, v)
+    self._str = s
+    return self
+  def __str__(self):
+    return self._str
+
+def create_unit(**units):
+  remaining = []
+  for key, value in units.items():
+    if isinstance(value, str):
+      remaining.append(key)
+    else:
+      assert not isinstance(value, builtins.tuple)
+      units[key] = value, {key: 1}
+  nmax = (len(remaining) * (len(remaining)+1)) // 2
+  for key in remaining:
+    assert nmax
+    nmax -= 1
+    try:
+      units[key] = _parse_unit(units[key], units)
+    except Exception as e:
+      remaining.append(key)
+  return type('<unit>', (Unit,), dict(__slots__=(), _units=units))
