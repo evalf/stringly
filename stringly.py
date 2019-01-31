@@ -109,14 +109,33 @@ def protect(s, c):
 def unprotect(s):
   return unescape(s[1:-1] if s.startswith('{') and s.endswith('}') else s)
 
-class structmeta(type):
-  def __new__(*args, **defaults):
-    cls = type.__new__(*args)
-    cls.defaults = defaults
-    return cls
-  def __init__(*args, **defaults):
-    type.__init__(*args)
+class booltype(type):
+  def __instancecheck__(cls, other):
+    return isinstance(other, builtins.bool)
+  def __call__(cls, s):
+    if s.lower() in ('true', 'yes'):
+      return True
+    elif s.lower() in ('false', 'no'):
+      return False
+    else:
+      raise Exception('invalid boolean value {!r}'.format(s))
+
+class bool(metaclass=booltype):
+  __str__ = bool.__str__
+
+class _type(type):
+  def __new__(mcls, *args, **typeargs):
+    return super().__new__(mcls, *args)
+  def __init__(cls, *args, **typeargs):
+    super().__init__(*args)
+    cls.__classinit__(cls, **typeargs)
   def __call__(cls, *args, **kwargs):
+    return cls.__new__(cls, *args, **kwargs)
+
+class struct(metaclass=_type):
+  def __classinit__(cls, **defaults):
+    cls.defaults = defaults
+  def __new__(cls, *args, **kwargs):
     assert cls is not struct
     if args:
       assert len(args) == 1
@@ -137,22 +156,16 @@ class structmeta(type):
       self.__dict__[key] = val
     self.__init__()
     return self
-
-class struct(metaclass=structmeta):
   def __str__(self):
     return ','.join('{}={}'.format(key, protect(getattr(self, key), ',')) for key in self.__class__.defaults)
   @classmethod
   def inline(cls, **kwargs):
-    return structmeta('<inline struct>', (cls,), {}, **kwargs)()
+    return _type('<inline struct>', (cls,), {}, **kwargs)()
 
-class tuplemeta(type):
-  def __new__(*args, **types):
-    cls = type.__new__(*args)
+class tuple(builtins.tuple, metaclass=_type):
+  def __classinit__(cls, **types):
     cls.types = types
-    return cls
-  def __init__(*args, **types):
-    type.__init__(*args)
-  def __call__(cls, *args):
+  def __new__(cls, *args):
     assert cls is not tuple
     assert len(args) <= 1
     items = args and args[0]
@@ -162,33 +175,15 @@ class tuplemeta(type):
     self = builtins.tuple.__new__(cls, items)
     self.__init__()
     return self
-
-class tuple(builtins.tuple, metaclass=tuplemeta):
   def __str__(self):
     clsname = {cls: name for name, cls in self.__class__.types.items()}
     return ','.join('{}:{}'.format(clsname[item.__class__], protect(item, ',')) for item in self)
-  @classmethod
-  def inline(*cls_args, **types):
-    cls, *args = cls_args
-    return tuplemeta('<inline tuple>', (cls,), {}, **types)(*args)
+  @staticmethod
+  def inline(*args, **types):
+    return _type('<inline tuple>', (tuple,), {}, **types)(*args)
 
-class boolmeta(type):
-  def __instancecheck__(cls, other):
-    return isinstance(other, builtins.bool)
-  def __call__(cls, s):
-    if s.lower() in ('true', 'yes'):
-      return True
-    elif s.lower() in ('false', 'no'):
-      return False
-    else:
-      raise Exception('invalid boolean value {!r}'.format(s))
-
-class bool(metaclass=boolmeta):
-  __str__ = bool.__str__
-
-class ImmutableMeta(type):
-  def __init__(cls, *args):
-    super().__init__(*args)
+class Immutable(metaclass=_type):
+  def __classinit__(cls):
     _self, *params = inspect.signature(cls.__init__).parameters.values()
     cls._types = collections.OrderedDict()
     for param in params:
@@ -201,7 +196,7 @@ class ImmutableMeta(type):
       else:
         raise Exception('{} constructor argument without default or annotation: {!r}'.format(cls.__name__, param.name))
       cls._types[param.name] = T
-  def __call__(*cls_args, **kwargs):
+  def __new__(*cls_args, **kwargs):
     cls, *args = cls_args
     if not args:
       _str = ','.join('{}={}'.format(name, protect(T.__str__(kwargs[name]), ',')) for name, T in cls._types.items() if name in kwargs)
@@ -215,12 +210,10 @@ class ImmutableMeta(type):
         kwargs[key] = T(unprotect(val))
     else:
       raise Exception('{} expects either keyword arguments or a single positional string'.format(cls.__name__))
-    self = cls.__new__(cls)
+    self = object.__new__(cls)
     self._str = _str # first set string representation in case the constructor hits an exception
     self.__init__(**kwargs)
     return self
-
-class Immutable(metaclass=ImmutableMeta):
   def __init__(self):
     raise Exception('Immutable base class cannot be instantiated')
   def __str__(self):
