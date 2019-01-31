@@ -181,13 +181,16 @@ class Choice(unittest.TestCase):
 
 class Unit(unittest.TestCase):
 
-  U = stringly.create_unit(m=1, s=1, g=1e-3, N='kg*m/s2', Pa='N/m2', lb='453.59237g', h='3600s', **{'in': '.0254m'})
+  class U(stringly.unit, m=1, s=1, g=1e-3, Pa='N/m2', N='kg*m*s-2', lb='453.59237g', h='3600s', **{'in': '.0254m'}):
+    pass
 
   def check(self, *args, **powers):
     s, v = args
     u = self.U(s)
     self.assertEqual(u, v)
-    self.assertEqual(u.__class__._powers, powers)
+    U = u.__class__
+    self.assertEqual(U._powers, powers)
+    self.assertEqual(U(s), v)
 
   def test_length(self):
     self.check('m', 1, m=1)
