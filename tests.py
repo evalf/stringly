@@ -109,7 +109,7 @@ class Struct(unittest.TestCase):
 
 class InlineStruct(Struct):
 
-  a = stringly.struct.inline(i=10, f=2.5, b=True)
+  a = stringly.struct(i=10, f=2.5, b=True)
   A = a.__class__
 
   def test_instance(self):
@@ -142,7 +142,7 @@ class Tuple(unittest.TestCase):
 
 class InlineTuple(Tuple):
 
-  t = stringly.tuple.inline('b:2', a=str, b=float)
+  t = stringly.tuple('b:2', a=str, b=float)
   T = t.__class__
 
   def test_instance(self):

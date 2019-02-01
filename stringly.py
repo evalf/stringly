@@ -124,10 +124,10 @@ class bool(metaclass=booltype):
   __str__ = bool.__str__
 
 class _type(type):
-  def __new__(mcls, *args, **typeargs):
-    return super().__new__(mcls, *args)
-  def __init__(cls, *args, **typeargs):
-    super().__init__(*args)
+  def __new__(mcls, name, bases, namespace, **typeargs):
+    return super().__new__(mcls, name, bases, namespace)
+  def __init__(cls, name, bases, namespace, **typeargs):
+    super().__init__(name, bases, namespace)
     cls.__classinit__(cls, **typeargs)
   def __call__(cls, *args, **kwargs):
     return cls.__new__(cls, *args, **kwargs)
@@ -135,8 +135,11 @@ class _type(type):
 class tuple(builtins.tuple, metaclass=_type):
   def __classinit__(cls, **types):
     cls.types = types
-  def __new__(cls, *args):
-    assert cls is not tuple
+  def __new__(cls, *args, **types):
+    if cls is tuple:
+      cls = _type('tuple:' + ','.join(types), (tuple,), {}, **types)
+    elif types:
+      raise Exception('{} does not accept keyword arguments'.format(cls.__name__))
     assert len(args) <= 1
     items = args and args[0]
     if isinstance(items, str):
@@ -148,9 +151,6 @@ class tuple(builtins.tuple, metaclass=_type):
   def __str__(self):
     clsname = {cls: name for name, cls in self.__class__.types.items()}
     return ','.join('{}:{}'.format(clsname[item.__class__], protect(item, ',')) for item in self)
-  @staticmethod
-  def inline(*args, **types):
-    return _type('<inline tuple>', (tuple,), {}, **types)(*args)
 
 class struct(metaclass=_type):
   def __classinit__(cls, **defaults):
@@ -162,6 +162,10 @@ class struct(metaclass=_type):
     cls._types = dict(getattr(cls.__base__, '_types', {}), **types)
   def __new__(*cls_args, **kwargs):
     cls, *args = cls_args
+    if cls is struct:
+      if args:
+        raise Exception('{} accepts only keyword arguments'.format(cls.__name__))
+      cls = type('struct:' + ','.join(kwargs), (cls,), {}, **kwargs)
     if args:
       if len(args) != 1 or kwargs:
         raise Exception('{} expects either keyword arguments or a single positional string'.format(cls.__name__))
@@ -180,9 +184,6 @@ class struct(metaclass=_type):
     self.__dict__.update(kwargs)
   def __str__(self):
     return ','.join('{}={}'.format(key, protect(self._types[key].__str__(value), ',')) for key, value in sorted(self._args.items()))
-  @classmethod
-  def inline(cls, **defaults):
-    return type('struct:' + ','.join(defaults), (cls,), {}, **defaults)()
 
 class choice:
   def __init__(self, **options):
