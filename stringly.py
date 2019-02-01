@@ -109,19 +109,13 @@ def protect(s, c):
 def unprotect(s):
   return unescape(s[1:-1] if s.startswith('{') and s.endswith('}') else s)
 
-class booltype(type):
-  def __instancecheck__(cls, other):
-    return isinstance(other, builtins.bool)
-  def __call__(cls, s):
-    if s.lower() in ('true', 'yes'):
-      return True
-    elif s.lower() in ('false', 'no'):
-      return False
-    else:
-      raise Exception('invalid boolean value {!r}'.format(s))
-
-class bool(metaclass=booltype):
-  __str__ = bool.__str__
+def _bool(s):
+  if s.lower() in ('true', 'yes'):
+    return True
+  elif s.lower() in ('false', 'no'):
+    return False
+  else:
+    raise Exception('invalid boolean value {!r}'.format(s))
 
 class _type(type):
   def __new__(mcls, name, bases, namespace, **typeargs):
@@ -156,7 +150,7 @@ class struct(metaclass=_type):
   def __classinit__(cls, **defaults):
     self, *params = inspect.signature(cls.__init__).parameters.values()
     defaults.update({param.name: param.default for param in params if param.default is not param.empty})
-    types = {name: default.__class__ if not isinstance(default, bool) else bool for name, default in defaults.items()}
+    types = {name: default.__class__ for name, default in defaults.items()}
     types.update({param.name: param.annotation for param in params if param.annotation is not param.empty and callable(param.annotation)})
     cls._defaults = dict(getattr(cls.__base__, '_defaults', {}), **defaults)
     cls._types = dict(getattr(cls.__base__, '_types', {}), **types)
@@ -174,6 +168,8 @@ class struct(metaclass=_type):
         T = cls._types.get(key)
         if not T:
           raise TypeError('unexpected keyword argument {!r}'.format(key))
+        if T is bool:
+          T = _bool
         kwargs[key] = T(unprotect(val))
     self = object.__new__(cls)
     self._args = cls._defaults.copy()
