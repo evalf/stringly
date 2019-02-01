@@ -20,7 +20,7 @@
 
 version = '1.0b0'
 
-import builtins, inspect, collections, re
+import builtins, inspect, re
 
 def safesplit(s, sep):
   if not s:
@@ -132,36 +132,6 @@ class _type(type):
   def __call__(cls, *args, **kwargs):
     return cls.__new__(cls, *args, **kwargs)
 
-class struct(metaclass=_type):
-  def __classinit__(cls, **defaults):
-    cls.defaults = defaults
-  def __new__(cls, *args, **kwargs):
-    assert cls is not struct
-    if args:
-      assert len(args) == 1
-      for arg in safesplit(args[0], ','):
-        key, sep, val = arg.partition('=')
-        if key in kwargs:
-          raise Exception('duplicate key {!r}'.format(key))
-        kwargs[key] = unprotect(val)
-    self = object.__new__(cls)
-    self.__dict__.update(cls.defaults)
-    for key, val in kwargs.items():
-      try:
-        defcls = cls.defaults[key].__class__
-      except KeyError as e:
-        raise TypeError('unexpected keyword argument {!r}'.format(key)) from e
-      if not isinstance(val, defcls):
-        val = defcls(val)
-      self.__dict__[key] = val
-    self.__init__()
-    return self
-  def __str__(self):
-    return ','.join('{}={}'.format(key, protect(getattr(self, key), ',')) for key in self.__class__.defaults)
-  @classmethod
-  def inline(cls, **kwargs):
-    return _type('<inline struct>', (cls,), {}, **kwargs)()
-
 class tuple(builtins.tuple, metaclass=_type):
   def __classinit__(cls, **types):
     cls.types = types
@@ -182,42 +152,37 @@ class tuple(builtins.tuple, metaclass=_type):
   def inline(*args, **types):
     return _type('<inline tuple>', (tuple,), {}, **types)(*args)
 
-class Immutable(metaclass=_type):
-  def __classinit__(cls):
-    _self, *params = inspect.signature(cls.__init__).parameters.values()
-    cls._types = collections.OrderedDict()
-    for param in params:
-      if param.kind == param.POSITIONAL_ONLY:
-        raise Exception('positional-only constructor argument in {}: {!r}'.format(cls.__name__, param.name))
-      if param.annotation is not param.empty and callable(param.annotation):
-        T = param.annotation
-      elif param.default is not param.empty:
-        T = param.default.__class__ if not isinstance(param.default, bool) else bool
-      else:
-        raise Exception('{} constructor argument without default or annotation: {!r}'.format(cls.__name__, param.name))
-      cls._types[param.name] = T
+class struct(metaclass=_type):
+  def __classinit__(cls, **defaults):
+    self, *params = inspect.signature(cls.__init__).parameters.values()
+    defaults.update({param.name: param.default for param in params if param.default is not param.empty})
+    types = {name: default.__class__ if not isinstance(default, bool) else bool for name, default in defaults.items()}
+    types.update({param.name: param.annotation for param in params if param.annotation is not param.empty and callable(param.annotation)})
+    cls._defaults = dict(getattr(cls.__base__, '_defaults', {}), **defaults)
+    cls._types = dict(getattr(cls.__base__, '_types', {}), **types)
   def __new__(*cls_args, **kwargs):
     cls, *args = cls_args
-    if not args:
-      _str = ','.join('{}={}'.format(name, protect(T.__str__(kwargs[name]), ',')) for name, T in cls._types.items() if name in kwargs)
-    elif len(args) == 1 and not kwargs:
-      _str, = args
-      for arg in safesplit(_str, ','):
+    if args:
+      if len(args) != 1 or kwargs:
+        raise Exception('{} expects either keyword arguments or a single positional string'.format(cls.__name__))
+      for arg in safesplit(args[0], ','):
         key, sep, val = arg.partition('=')
         T = cls._types.get(key)
         if not T:
           raise TypeError('unexpected keyword argument {!r}'.format(key))
         kwargs[key] = T(unprotect(val))
-    else:
-      raise Exception('{} expects either keyword arguments or a single positional string'.format(cls.__name__))
     self = object.__new__(cls)
-    self._str = _str # first set string representation in case the constructor hits an exception
-    self.__init__(**kwargs)
+    self._args = cls._defaults.copy()
+    self._args.update(kwargs)
+    self.__init__(**self._args)
     return self
-  def __init__(self):
-    raise Exception('Immutable base class cannot be instantiated')
+  def __init__(self, **kwargs):
+    self.__dict__.update(kwargs)
   def __str__(self):
-    return self._str
+    return ','.join('{}={}'.format(key, protect(self._types[key].__str__(value), ',')) for key, value in sorted(self._args.items()))
+  @classmethod
+  def inline(cls, **defaults):
+    return type('struct:' + ','.join(defaults), (cls,), {}, **defaults)()
 
 class choice:
   def __init__(self, **options):
