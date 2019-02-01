@@ -185,28 +185,33 @@ class struct(metaclass=_type):
   def __str__(self):
     return ','.join('{}={}'.format(key, protect(self._types[key].__str__(value), ',')) for key, value in sorted(self._args.items()))
 
-class choice:
-  def __init__(self, **options):
-    self.options = options
-  def __call__(self, s):
+class choice(type):
+  def __new__(mcls, name='choice', bases=(), namespace={}, **options):
+    return super().__new__(mcls, name, bases, namespace)
+  def __init__(cls, name='choice', bases=(), namespace={}, **options):
+    super().__init__(name, bases, namespace)
+    cls.options = options
+    cls.__str__ = cls.__invcall__
+  def __str__(cls):
+    return '|'.join(sorted(cls.options))
+  def __instancecheck__(cls, other):
+    return any(val == arg or isinstance(val, type) and isinstance(arg, val) for val in options.values())
+  def __invcall__(cls, obj):
+    for key, val in cls.options.items():
+      if val == obj:
+        return key
+      if isinstance(val, type) and isinstance(obj, val):
+        return '{}:{}'.format(key, obj)
+    raise Exception('unrecognized object {!r}'.format(obj))
+  def __call__(cls, s):
     assert isinstance(s, str)
     key, sep, tail = s.partition(':')
-    value = self.options[key]
-    if isinstance(value, type):
-      value = value(tail)
+    obj = cls.options[key]
+    if isinstance(obj, type):
+      obj = obj(tail)
     else:
       assert not sep
-    return value
-  def __str__(self, *args):
-    if not args:
-      return '|'.join(sorted(self.options))
-    arg, = args
-    for key, val in self.options.items():
-      if val == arg:
-        return key
-      if isinstance(val, type) and isinstance(arg, val):
-        return '{}:{}'.format(key, arg)
-    raise Exception('unrecognized object {!r}'.format(arg))
+    return obj
 
 class unit(float, metaclass=_type):
   _pattern = re.compile('([a-zA-Zα-ωΑ-Ω]+)')
