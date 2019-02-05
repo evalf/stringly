@@ -230,14 +230,14 @@ class unit(float, metaclass=_type):
     if hasattr(cls, '_powers'):
       assert cls._powers == powers, 'invalid unit: expected {}, got {}'.format(cls._powers, powers)
     else: # create subtype, bypassing _type (and __classinit__) but using type instead
-      cls = type.__new__(type, 'unit:' + ''.join(str(s) for item in powers.items() for s in item), (cls,), dict(_powers=powers))
+      cls = type.__new__(type, ''.join(str(s) for item in powers.items() for s in item), (cls,), dict(_powers=powers))
     self = float.__new__(cls, v)
     self._str = s
     return self
   @classmethod
   def _parse(cls, s, modifiers=dict(p=1e-9, μ=1e-6, m=1e-3, c=1e-2, d=1e-1, k=1e3, M=1e6, G=1e9)):
     parts = cls._pattern.split(s)
-    value = float(parts[0] or 1)
+    value = float(parts[0].rstrip('*/') or 1)
     powers = {}
     for i in range(1, len(parts), 2):
       s = int(parts[i+1].rstrip('*/') or 1)
