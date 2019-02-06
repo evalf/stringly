@@ -94,6 +94,7 @@ def unescape(escaped):
   return s
 
 def protect(s, c):
+  s = str(s)
   if not isnormal(s):
     return '{' + escape(s) + '}' # always embrace escaped strings to make them normal
   if s.startswith('{') and s.endswith('}'):
@@ -140,7 +141,7 @@ class structmeta(type):
 
 class struct(metaclass=structmeta):
   def __str__(self):
-    return ','.join('{}={}'.format(key, protect(str(getattr(self, key)), ',')) for key in self.__class__.defaults)
+    return ','.join('{}={}'.format(key, protect(getattr(self, key), ',')) for key in self.__class__.defaults)
 
 class tuplemeta(type):
   def __new__(*args, **types):
@@ -165,4 +166,4 @@ class tuplemeta(type):
 class tuple(builtins.tuple, metaclass=tuplemeta, types=()):
   def __str__(self):
     clsname = {cls: name for name, cls in self.__class__.types.items()}
-    return ','.join('{}:{}'.format(clsname[item.__class__], protect(str(item), ',')) for item in self)
+    return ','.join('{}:{}'.format(clsname[item.__class__], protect(item, ',')) for item in self)
