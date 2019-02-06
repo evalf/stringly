@@ -180,3 +180,42 @@ class tuple(builtins.tuple, metaclass=_noinit):
   def __str__(self):
     clsname = {cls: name for name, cls in self.__class__.types.items()}
     return ','.join('{}:{}'.format(clsname[item.__class__], protect(item, ',')) for item in self)
+
+class choice(metaclass=_noinit):
+  def __getattr__(self, attr): return getattr(self.value, attr)
+  def __bool__(self): return bool(self.value)
+  def __int__(self): return int(self.value)
+  def __float__(self): return float(self.value)
+  def __abs__(self): return abs(self.value)
+  def __lt__(self, other): return self.value < other
+  def __le__(self, other): return self.value <= other
+  def __gt__(self, other): return self.value > other
+  def __ge__(self, other): return self.value >= other
+  def __eq__(self, other): return self.value == other
+  def __ne__(self, other): return self.value != other
+  def __getitem__(self, item): return self.value[item]
+  def __call__(self, *args, **kwargs): return self.value(*args, **kwargs)
+  def __init_subclass__(cls, **options):
+    super().__init_subclass__()
+    cls._options = options
+  def __new__(*cls_s, **options):
+    cls, s = cls_s
+    assert isinstance(s, str)
+    if cls is choice:
+      cls = _noinit('|'.join(options), (choice,), {}, **options)
+    elif options:
+      raise Exception('{} does not accept keyword arguments'.format(cls.__name__))
+    key, sep, tail = s.partition(':')
+    obj = cls._options[key]
+    if obj is bool:
+      obj = _bool(tail)
+    elif isinstance(obj, type):
+      obj = obj(tail)
+    else:
+      assert not sep
+    self = object.__new__(cls)
+    self.key = key
+    self.value = obj
+    return self
+  def __str__(self):
+    return '{}:{}'.format(self.key, self.value) if isinstance(self._options[self.key], type) else self.key
