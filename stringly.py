@@ -160,27 +160,23 @@ class struct(metaclass=_noinit):
   def __str__(self):
     return ','.join('{}={}'.format(key, protect(self._types[key].__str__(value), ',')) for key, value in sorted(self._args.items()))
 
-class tuplemeta(type):
-  def __new__(*args, **types):
-    cls = type.__new__(*args)
+class tuple(builtins.tuple, metaclass=_noinit):
+  def __init_subclass__(cls, **types):
+    super().__init_subclass__()
     cls.types = types
-    return cls
-  def __init__(*args, **types):
-    type.__init__(*args)
-  def __call__(cls, *args, **types):
+  def __new__(cls, *args, **types):
     if cls is tuple:
-      name = '<tuple of {}>'.format(', '.join(types))
-      return tuplemeta(name, (tuple,), {}, **types)(*args)
-    assert not types and len(args) <= 1
+      cls = type('tuple:' + ','.join(types), (tuple,), {}, **types)
+    elif types:
+      raise Exception('{} does not accept keyword arguments'.format(cls.__name__))
+    assert len(args) <= 1
     items = args and args[0]
     if isinstance(items, str):
       split = [item.partition(':')[::2] for item in safesplit(items, ',')]
       items = [cls.types[name](unprotect(args)) for name, args in split]
     self = builtins.tuple.__new__(cls, items)
-    self.__init__()
+    self.__init__(items)
     return self
-
-class tuple(builtins.tuple, metaclass=tuplemeta, types=()):
   def __str__(self):
     clsname = {cls: name for name, cls in self.__class__.types.items()}
     return ','.join('{}:{}'.format(clsname[item.__class__], protect(item, ',')) for item in self)
