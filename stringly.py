@@ -117,21 +117,17 @@ def _bool(s):
   else:
     raise Exception('invalid boolean value {!r}'.format(s))
 
-class _type(type):
-  def __new__(mcls, name, bases, namespace, **typeargs):
-    return super().__new__(mcls, name, bases, namespace)
-  def __init__(cls, name, bases, namespace, **typeargs):
-    super().__init__(name, bases, namespace)
-    cls.__classinit__(cls, **typeargs)
-  def __call__(cls, *args, **kwargs):
-    return cls.__new__(cls, *args, **kwargs)
+class _noinit(type):
+  def __call__(*args, **kwargs):
+    return args[0].__new__(*args, **kwargs)
 
-class tuple(builtins.tuple, metaclass=_type):
-  def __classinit__(cls, **types):
+class tuple(builtins.tuple, metaclass=_noinit):
+  def __init_subclass__(cls, **types):
+    super().__init_subclass__()
     cls.types = types
   def __new__(cls, *args, **types):
     if cls is tuple:
-      cls = _type('tuple:' + ','.join(types), (tuple,), {}, **types)
+      cls = type('tuple:' + ','.join(types), (tuple,), {}, **types)
     elif types:
       raise Exception('{} does not accept keyword arguments'.format(cls.__name__))
     assert len(args) <= 1
@@ -140,14 +136,15 @@ class tuple(builtins.tuple, metaclass=_type):
       split = [item.partition(':')[::2] for item in safesplit(items, ',')]
       items = [cls.types[name](unprotect(args)) for name, args in split]
     self = builtins.tuple.__new__(cls, items)
-    self.__init__()
+    self.__init__(items)
     return self
   def __str__(self):
     clsname = {cls: name for name, cls in self.__class__.types.items()}
     return ','.join('{}:{}'.format(clsname[item.__class__], protect(item, ',')) for item in self)
 
-class struct(metaclass=_type):
-  def __classinit__(cls, **defaults):
+class struct(metaclass=_noinit):
+  def __init_subclass__(cls, **defaults):
+    super().__init_subclass__()
     self, *params = inspect.signature(cls.__init__).parameters.values()
     defaults.update({param.name: param.default for param in params if param.default is not param.empty})
     types = {name: default.__class__ for name, default in defaults.items()}
@@ -181,14 +178,16 @@ class struct(metaclass=_type):
   def __str__(self):
     return ','.join('{}={}'.format(key, protect(self._types[key].__str__(value), ',')) for key, value in sorted(self._args.items()))
 
-class choice(metaclass=_type):
-  def __classinit__(cls, **options):
-    cls._options = options
+class choice(metaclass=_noinit):
+  def __init_subclass__(cls, **options):
+    super().__init_subclass__()
+    if options:
+      cls._options = options
   def __new__(*cls_s, **options):
     cls, s = cls_s
     assert isinstance(s, str)
     if cls is choice:
-      cls = _type('|'.join(options), (choice,), {}, **options)
+      cls = _noinit('|'.join(options), (choice,), {}, **options)
     elif options:
       raise Exception('{} does not accept keyword arguments'.format(cls.__name__))
     if not issubclass(cls.__base__, choice):
@@ -203,7 +202,7 @@ class choice(metaclass=_type):
     else:
       assert not sep
     objcls = obj.__class__
-    subcls = type.__new__(type, key, (cls, objcls), {})
+    subcls = type(key, (cls, objcls), {})
     return objcls.__new__(subcls, obj)
   def __str__(self):
     s = self.__class__.__name__
@@ -211,9 +210,12 @@ class choice(metaclass=_type):
       s += ':' + super().__str__()
     return s
 
-class unit(float, metaclass=_type):
+class unit(float, metaclass=_noinit):
   _pattern = re.compile('([a-zA-Zα-ωΑ-Ω]+)')
-  def __classinit__(cls, **units):
+  def __init_subclass__(cls, **units):
+    super().__init_subclass__()
+    if not units:
+      return
     remaining = {key: cls._pattern.findall(value) if isinstance(value, str) else 1 for key, value in units.items()}
     def depth(key):
       if key not in units:
@@ -231,8 +233,8 @@ class unit(float, metaclass=_type):
     v, powers = cls._parse(s)
     if hasattr(cls, '_powers'):
       assert cls._powers == powers, 'invalid unit: expected {}, got {}'.format(cls._powers, powers)
-    else: # create subtype, bypassing _type (and __classinit__) but using type instead
-      cls = type.__new__(type, ''.join(str(s) for item in powers.items() for s in item), (cls,), dict(_powers=powers))
+    else:
+      cls = type(''.join(str(s) for item in powers.items() for s in item), (cls,), dict(_powers=powers))
     self = float.__new__(cls, v)
     self._str = s
     return self
