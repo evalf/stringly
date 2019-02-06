@@ -149,8 +149,11 @@ class struct(metaclass=_noinit):
     defaults.update({param.name: param.default for param in params if param.default is not param.empty})
     types = {name: default.__class__ for name, default in defaults.items()}
     types.update({param.name: param.annotation for param in params if param.annotation is not param.empty and callable(param.annotation)})
-    cls._defaults = dict(getattr(cls.__base__, '_defaults', {}), **defaults)
-    cls._types = dict(getattr(cls.__base__, '_types', {}), **types)
+    if any(param.kind == param.VAR_KEYWORD for param in params) and hasattr(cls, '_types'):
+      defaults = dict(cls._defaults, **defaults)
+      types = dict(cls._types, **types)
+    cls._defaults = defaults
+    cls._types = types
   def __new__(*cls_args, **kwargs):
     cls, *args = cls_args
     if cls is struct:
