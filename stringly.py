@@ -178,37 +178,30 @@ class struct(metaclass=_noinit):
   def __str__(self):
     return ','.join('{}={}'.format(key, protect(self._types[key].__str__(value), ',')) for key, value in sorted(self._args.items()))
 
-class choice(metaclass=_noinit):
-  def __init_subclass__(cls, **options):
-    super().__init_subclass__()
-    if options:
-      cls._options = options
-  def __new__(*cls_s, **options):
-    cls, s = cls_s
-    assert isinstance(s, str)
-    if cls is choice:
-      cls = _noinit('|'.join(options), (choice,), {}, **options)
-    elif options:
-      raise Exception('{} does not accept keyword arguments'.format(cls.__name__))
-    if not issubclass(cls.__base__, choice):
-      cls, wrapped = cls.__bases__
-    assert issubclass(cls, choice)
+class choice:
+  def __init__(*args, **options):
+    self, = args
+    self._options = options
+  def __call__(self, s):
     key, sep, tail = s.partition(':')
-    obj = cls._options[key]
+    obj = self._options[key]
     if obj is bool:
       obj = _bool(tail)
     elif isinstance(obj, type):
       obj = obj(tail)
     else:
       assert not sep
-    objcls = obj.__class__
-    subcls = type(key, (cls, objcls), {})
-    return objcls.__new__(subcls, obj)
-  def __str__(self):
-    s = self.__class__.__name__
-    if isinstance(self._options[s], type):
-      s += ':' + super().__str__()
-    return s
+    return obj
+  def __str__(self, *args):
+    if not args:
+      return '|'.join(self._options)
+    obj, = args
+    for key, value in self._options.items():
+      if obj is value:
+        return key
+      if isinstance(value, type) and isinstance(obj, value):
+        return '{}:{}'.format(key, obj)
+    raise Exception
 
 class unit(float, metaclass=_noinit):
   _pattern = re.compile('([a-zA-Zα-ωΑ-Ω]+)')

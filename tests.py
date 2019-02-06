@@ -150,8 +150,7 @@ class InlineTuple(Tuple):
 
 class Choice(unittest.TestCase):
 
-  class C(stringly.choice, a=float, b=2):
-    pass
+  C = stringly.choice(a=float, b=2)
 
   def check(self, c, expect):
     self.assertEqual(c, expect)
@@ -164,17 +163,9 @@ class Choice(unittest.TestCase):
     self.check(self.C('a:2.5'), 2.5)
 
   def test_string(self):
-    #self.assertEqual(str(self.c), 'a|b')
-    self.assertEqual(str(self.C('a:1')), 'a:1.0')
-    self.assertEqual(str(self.C('b')), 'b')
-
-class InlineChoice(Choice):
-
-  c = stringly.choice('b', a=float, b=2)
-  C = c.__class__
-
-  def test_instance(self):
-    self.check(self.c, 2)
+    self.assertEqual(str(self.C), 'a|b')
+    self.assertEqual(self.C.__str__(1.), 'a:1.0')
+    self.assertEqual(self.C.__str__(2), 'b')
 
 class Unit(unittest.TestCase):
 
