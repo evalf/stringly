@@ -150,11 +150,12 @@ class InlineTuple(Tuple):
 
 class Choice(unittest.TestCase):
 
-  C = stringly.choice(a=float, b=2)
+  class C(stringly.choice, a=float, b=2):
+    pass
 
   def check(self, c, expect):
     self.assertEqual(c, expect)
-    self.assertIsInstance(c, expect.__class__)
+    self.assertIsInstance(c.value, expect.__class__)
 
   def test_objarg(self):
     self.check(self.C('b'), 2)
@@ -163,9 +164,13 @@ class Choice(unittest.TestCase):
     self.check(self.C('a:2.5'), 2.5)
 
   def test_string(self):
-    self.assertEqual(str(self.C), 'a|b')
-    self.assertEqual(self.C.__str__(1.), 'a:1.0')
-    self.assertEqual(self.C.__str__(2), 'b')
+    self.assertEqual(str(self.C('a:1')), 'a:1.0')
+    self.assertEqual(str(self.C('b')), 'b')
+
+class InlineChoice(unittest.TestCase):
+
+  c = stringly.choice('a:1', a=float, b=2)
+  C = c.__class__
 
 class Unit(unittest.TestCase):
 
