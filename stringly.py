@@ -20,7 +20,7 @@
 
 version = '1.0b0'
 
-import builtins, inspect
+import builtins, inspect, re
 
 def safesplit(s, sep):
   if not s:
@@ -219,3 +219,52 @@ class choice(metaclass=_noinit):
     return self
   def __str__(self):
     return '{}:{}'.format(self.key, self.value) if isinstance(self._options[self.key], type) else self.key
+
+class unit(float, metaclass=_noinit):
+  _pattern = re.compile('([a-zA-Zα-ωΑ-Ω]+)')
+  def __init_subclass__(cls, **units):
+    super().__init_subclass__()
+    if not units:
+      return
+    remaining = {key: cls._pattern.findall(value) if isinstance(value, str) else 1 for key, value in units.items()}
+    def depth(key):
+      if key not in units:
+        key = key[1:]
+      d = remaining[key]
+      if not isinstance(d, int):
+        del remaining[key] # safeguard for circular refrences
+        remaining[key] = d = sum(map(depth, d))
+      return d
+    cls._units = {}
+    for key in sorted(remaining, key=depth):
+      value = units[key]
+      cls._units[key] = cls._parse(value) if isinstance(value, str) else (value, {key: 1})
+  def __new__(cls, s):
+    v, powers = cls._parse(s)
+    if hasattr(cls, '_powers'):
+      assert cls._powers == powers, 'invalid unit: expected {}, got {}'.format(cls._powers, powers)
+    else:
+      cls = type(''.join(str(s) for item in powers.items() for s in item), (cls,), dict(_powers=powers))
+    self = float.__new__(cls, v)
+    self._str = s
+    return self
+  @classmethod
+  def _parse(cls, s, modifiers=dict(p=1e-9, μ=1e-6, m=1e-3, c=1e-2, d=1e-1, k=1e3, M=1e6, G=1e9)):
+    parts = cls._pattern.split(s)
+    value = float(parts[0].rstrip('*/') or 1)
+    powers = {}
+    for i in range(1, len(parts), 2):
+      s = int(parts[i+1].rstrip('*/') or 1)
+      if parts[i-1].endswith('/'):
+        s = -s
+      key = parts[i]
+      if key not in cls._units:
+        v, p = cls._units[key[1:]]
+        v *= modifiers[key[0]]
+      else:
+        v, p = cls._units[key]
+      value *= v**s
+      powers.update({c: powers.get(c, 0) + n * s for c, n in p.items()})
+    return value, {c: n for c, n in powers.items() if n}
+  def __str__(self):
+    return self._str
