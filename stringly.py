@@ -20,7 +20,7 @@
 
 version = '1.0b0'
 
-import builtins
+import builtins, inspect
 
 def safesplit(s, sep):
   if not s:
@@ -109,39 +109,56 @@ def protect(s, c):
 def unprotect(s):
   return unescape(s[1:-1] if s.startswith('{') and s.endswith('}') else s)
 
-class structmeta(type):
-  def __new__(*args, **defaults):
-    cls = type.__new__(*args)
-    cls.defaults = defaults
-    return cls
-  def __init__(*args, **defaults):
-    type.__init__(*args)
-  def __call__(cls, *args, **kwargs):
+def _bool(s):
+  if s.lower() in ('true', 'yes'):
+    return True
+  elif s.lower() in ('false', 'no'):
+    return False
+  else:
+    raise Exception('invalid boolean value {!r}'.format(s))
+
+class _noinit(type):
+  def __call__(*args, **kwargs):
+    return args[0].__new__(*args, **kwargs)
+
+class struct(metaclass=_noinit):
+  def __init_subclass__(cls, **defaults):
+    super().__init_subclass__()
+    self, *params = inspect.signature(cls.__init__).parameters.values()
+    defaults.update({param.name: param.default for param in params if param.default is not param.empty})
+    types = {name: default.__class__ for name, default in defaults.items()}
+    types.update({param.name: param.annotation for param in params if param.annotation is not param.empty and callable(param.annotation)})
+    if any(param.kind == param.VAR_KEYWORD for param in params) and hasattr(cls, '_types'):
+      defaults = dict(cls._defaults, **defaults)
+      types = dict(cls._types, **types)
+    cls._defaults = defaults
+    cls._types = types
+  def __new__(*cls_args, **kwargs):
+    cls, *args = cls_args
+    if cls is struct:
+      if args:
+        raise Exception('{} accepts only keyword arguments'.format(cls.__name__))
+      cls = type('struct:' + ','.join(kwargs), (cls,), {}, **kwargs)
     if args:
-      assert len(args) == 1 and not kwargs
+      if len(args) != 1 or kwargs:
+        raise Exception('{} expects either keyword arguments or a single positional string'.format(cls.__name__))
       for arg in safesplit(args[0], ','):
         key, sep, val = arg.partition('=')
-        kwargs[key] = unprotect(val)
-    if cls is struct:
-      # direct invocation of struct returns an automatically generated subtype
-      name = '<struct of {}>'.format(', '.join(kwargs))
-      return structmeta(name, (cls,), {}, **kwargs)()
+        T = cls._types.get(key)
+        if not T:
+          raise TypeError('unexpected keyword argument {!r}'.format(key))
+        if T is bool:
+          T = _bool
+        kwargs[key] = T(unprotect(val))
     self = object.__new__(cls)
-    self.__dict__.update(cls.defaults)
-    for key, val in kwargs.items():
-      try:
-        defcls = cls.defaults[key].__class__
-      except KeyError:
-        raise TypeError('unexpected keyword argument {!r}'.format(key))
-      if not isinstance(val, defcls):
-        val = defcls(val)
-      self.__dict__[key] = val
-    self.__init__()
+    self._args = cls._defaults.copy()
+    self._args.update(kwargs)
+    self.__init__(**self._args)
     return self
-
-class struct(metaclass=structmeta):
+  def __init__(self, **kwargs):
+    self.__dict__.update(kwargs)
   def __str__(self):
-    return ','.join('{}={}'.format(key, protect(getattr(self, key), ',')) for key in self.__class__.defaults)
+    return ','.join('{}={}'.format(key, protect(self._types[key].__str__(value), ',')) for key, value in sorted(self._args.items()))
 
 class tuplemeta(type):
   def __new__(*args, **types):
