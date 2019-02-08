@@ -59,3 +59,155 @@ class Protect(unittest.TestCase):
     self.assertProtected('}abc{', '{}{abc{}}')
     self.assertProtected('}abc', '{}{abc}')
     self.assertProtected('abc{', '{abc{}}')
+
+class Struct(unittest.TestCase):
+
+  class A(stringly.struct, b=True):
+    def __init__(self, b, i:int, f=2.5):
+      self.b = b
+      self.f = f
+      self.i = i
+
+  def check(self, a, *, i, f, b):
+    self.assertIsInstance(a.i, int)
+    self.assertEqual(a.i, i)
+    self.assertIsInstance(a.f, float)
+    self.assertEqual(a.f, f)
+    self.assertIsInstance(a.b, bool)
+    self.assertEqual(a.b, b)
+
+  def test_keywordargs(self):
+    a = self.A(i=5, f=10., b=False)
+    self.check(a, i=5, f=10., b=False)
+    self.assertEqual(str(a), 'b=False,f=10.0,i=5')
+
+  def test_partialkeywordargs(self):
+    a = self.A(i=5, f=10.)
+    self.check(a, i=5, f=10., b=True)
+    self.assertEqual(str(a), 'b=True,f=10.0,i=5')
+
+  def test_stringarg(self):
+    a = self.A('f=10,i=5,b=no')
+    self.check(a, i=5, f=10., b=False)
+    self.assertEqual(str(a), 'b=False,f=10.0,i=5')
+
+  def test_partialstringarg(self):
+    a = self.A('i=1')
+    self.check(a, i=1, f=2.5, b=True)
+    self.assertEqual(str(a), 'b=True,f=2.5,i=1')
+
+  def test_subclass(self):
+    class B(self.A):
+      def __init__(_self, s='foo', **kwargs):
+        self.assertEqual(kwargs, dict(i=10, f=2.5, b=True))
+        _self.s = s
+        super().__init__(**kwargs)
+    b = B(i=10)
+    self.check(b, i=10, f=2.5, b=True)
+    self.assertEqual(b.s, 'foo')
+    self.assertEqual(str(b), 'b=True,f=2.5,i=10,s=foo')
+
+class InlineStruct(Struct):
+
+  a = stringly.struct(i=10, f=2.5, b=True)
+  A = a.__class__
+
+  def test_instance(self):
+    self.check(self.a, i=10, f=2.5, b=True)
+
+class Tuple(unittest.TestCase):
+
+  class T(stringly.tuple, a=str, b=float):
+    pass
+
+  def check(self, t, *values):
+    self.assertEqual(len(t), len(values))
+    for i, v in enumerate(values):
+      self.assertEqual(t[i], v)
+      self.assertIsInstance(t[i], v.__class__)
+
+  def test_defaults(self):
+    self.check(self.T())
+
+  def test_stringarg(self):
+    self.check(self.T('b:1,a:2'), 1., '2')
+
+  def test_directarg(self):
+    self.check(self.T([1., '2']), 1., '2')
+
+  def test_string(self):
+    self.assertEqual(str(self.T()), '')
+    self.assertEqual(str(self.T([1., '2'])), 'b:1.0,a:2')
+    self.assertEqual(str(self.T('a:1,b:2')), 'a:1,b:2.0')
+
+class InlineTuple(Tuple):
+
+  t = stringly.tuple('b:2', a=str, b=float)
+  T = t.__class__
+
+  def test_instance(self):
+    self.check(self.t, 2.)
+
+class Choice(unittest.TestCase):
+
+  class C(stringly.choice, a=float, b=2):
+    pass
+
+  def check(self, c, expect):
+    self.assertEqual(c, expect)
+    self.assertIsInstance(c.value, expect.__class__)
+
+  def test_objarg(self):
+    self.check(self.C('b'), 2)
+
+  def test_typeargstring(self):
+    self.check(self.C('a:2.5'), 2.5)
+
+  def test_string(self):
+    self.assertEqual(str(self.C('a:1')), 'a:1.0')
+    self.assertEqual(str(self.C('b')), 'b')
+
+class InlineChoice(Choice):
+
+  c = stringly.choice('a:1', a=float, b=2)
+  C = c.__class__
+
+  def test_instance(self):
+    self.check(self.c, 1.)
+
+class Unit(unittest.TestCase):
+
+  class U(stringly.unit, m=1, s=1, g=1e-3, Pa='N/m2', N='kg*m*s-2', lb='453.59237g', h='3600s', **{'in': '.0254m'}):
+    pass
+
+  def check(self, *args, **powers):
+    s, v = args
+    u = self.U(s)
+    self.assertEqual(u, v)
+    U = u.__class__
+    self.assertEqual(U._powers, powers)
+    self.assertEqual(U(s), v)
+
+  def test_length(self):
+    self.check('m', 1, m=1)
+    self.check('10in', .254, m=1)
+
+  def test_mass(self):
+    self.check('kg', 1, g=1)
+    self.check('1lb', .45359237, g=1)
+
+  def test_time(self):
+    self.check('s', 1, s=1)
+    self.check('.5h', 1800, s=1)
+
+  def test_velocity(self):
+    self.check('m/s', 1, m=1, s=-1)
+    self.check('km/h', 1/3.6, m=1, s=-1)
+
+  def test_force(self):
+    self.check('N', 1, g=1, m=1, s=-2)
+    self.check('100Pa*in2', .254**2, g=1, m=1, s=-2)
+
+  def test_pressure(self):
+    self.check('Pa', 1, g=1, m=-1, s=-2)
+    self.check('10000lb/in/h2', 453.59237/25.4/36**2, g=1, m=-1, s=-2)

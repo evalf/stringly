@@ -20,7 +20,7 @@
 
 version = '1.0b0'
 
-import builtins
+import builtins, inspect, re
 
 def safesplit(s, sep):
   if not s:
@@ -94,6 +94,7 @@ def unescape(escaped):
   return s
 
 def protect(s, c):
+  s = str(s)
   if not isnormal(s):
     return '{' + escape(s) + '}' # always embrace escaped strings to make them normal
   if s.startswith('{') and s.endswith('}'):
@@ -108,61 +109,162 @@ def protect(s, c):
 def unprotect(s):
   return unescape(s[1:-1] if s.startswith('{') and s.endswith('}') else s)
 
-class structmeta(type):
-  def __new__(*args, **defaults):
-    cls = type.__new__(*args)
-    cls.defaults = defaults
-    return cls
-  def __init__(*args, **defaults):
-    type.__init__(*args)
-  def __call__(cls, *args, **kwargs):
+def _bool(s):
+  if s.lower() in ('true', 'yes'):
+    return True
+  elif s.lower() in ('false', 'no'):
+    return False
+  else:
+    raise Exception('invalid boolean value {!r}'.format(s))
+
+class _noinit(type):
+  def __call__(*args, **kwargs):
+    return args[0].__new__(*args, **kwargs)
+
+class struct(metaclass=_noinit):
+  def __init_subclass__(cls, **defaults):
+    super().__init_subclass__()
+    self, *params = inspect.signature(cls.__init__).parameters.values()
+    defaults.update({param.name: param.default for param in params if param.default is not param.empty})
+    types = {name: default.__class__ for name, default in defaults.items()}
+    types.update({param.name: param.annotation for param in params if param.annotation is not param.empty and callable(param.annotation)})
+    if any(param.kind == param.VAR_KEYWORD for param in params) and hasattr(cls, '_types'):
+      defaults = dict(cls._defaults, **defaults)
+      types = dict(cls._types, **types)
+    cls._defaults = defaults
+    cls._types = types
+  def __new__(*cls_args, **kwargs):
+    cls, *args = cls_args
+    if cls is struct:
+      if args:
+        raise Exception('{} accepts only keyword arguments'.format(cls.__name__))
+      cls = type('struct:' + ','.join(kwargs), (cls,), {}, **kwargs)
     if args:
-      assert len(args) == 1 and not kwargs
+      if len(args) != 1 or kwargs:
+        raise Exception('{} expects either keyword arguments or a single positional string'.format(cls.__name__))
       for arg in safesplit(args[0], ','):
         key, sep, val = arg.partition('=')
-        kwargs[key] = unprotect(val)
-    if cls is struct:
-      # direct invocation of struct returns an automatically generated subtype
-      name = '<struct of {}>'.format(', '.join(kwargs))
-      return structmeta(name, (cls,), {}, **kwargs)()
+        T = cls._types.get(key)
+        if not T:
+          raise TypeError('unexpected keyword argument {!r}'.format(key))
+        if T is bool:
+          T = _bool
+        kwargs[key] = T(unprotect(val))
     self = object.__new__(cls)
-    self.__dict__.update(cls.defaults)
-    for key, val in kwargs.items():
-      try:
-        defcls = cls.defaults[key].__class__
-      except KeyError:
-        raise TypeError('unexpected keyword argument {!r}'.format(key))
-      if not isinstance(val, defcls):
-        val = defcls(val)
-      self.__dict__[key] = val
-    self.__init__()
+    self._args = cls._defaults.copy()
+    self._args.update(kwargs)
+    self.__init__(**self._args)
     return self
-
-class struct(metaclass=structmeta):
+  def __init__(self, **kwargs):
+    self.__dict__.update(kwargs)
   def __str__(self):
-    return ','.join('{}={}'.format(key, protect(str(getattr(self, key)), ',')) for key in self.__class__.defaults)
+    return ','.join('{}={}'.format(key, protect(self._types[key].__str__(value), ',')) for key, value in sorted(self._args.items()))
 
-class tuplemeta(type):
-  def __new__(*args, **types):
-    cls = type.__new__(*args)
+class tuple(builtins.tuple, metaclass=_noinit):
+  def __init_subclass__(cls, **types):
+    super().__init_subclass__()
     cls.types = types
-    return cls
-  def __init__(*args, **types):
-    type.__init__(*args)
-  def __call__(cls, *args, **types):
+  def __new__(cls, *args, **types):
     if cls is tuple:
-      name = '<tuple of {}>'.format(', '.join(types))
-      return tuplemeta(name, (tuple,), {}, **types)(*args)
-    assert not types and len(args) <= 1
+      cls = type('tuple:' + ','.join(types), (tuple,), {}, **types)
+    elif types:
+      raise Exception('{} does not accept keyword arguments'.format(cls.__name__))
+    assert len(args) <= 1
     items = args and args[0]
     if isinstance(items, str):
       split = [item.partition(':')[::2] for item in safesplit(items, ',')]
       items = [cls.types[name](unprotect(args)) for name, args in split]
     self = builtins.tuple.__new__(cls, items)
-    self.__init__()
+    self.__init__(items)
     return self
-
-class tuple(builtins.tuple, metaclass=tuplemeta, types=()):
   def __str__(self):
     clsname = {cls: name for name, cls in self.__class__.types.items()}
-    return ','.join('{}:{}'.format(clsname[item.__class__], protect(str(item), ',')) for item in self)
+    return ','.join('{}:{}'.format(clsname[item.__class__], protect(item, ',')) for item in self)
+
+class choice(metaclass=_noinit):
+  def __getattr__(self, attr): return getattr(self.value, attr)
+  def __bool__(self): return bool(self.value)
+  def __int__(self): return int(self.value)
+  def __float__(self): return float(self.value)
+  def __abs__(self): return abs(self.value)
+  def __lt__(self, other): return self.value < other
+  def __le__(self, other): return self.value <= other
+  def __gt__(self, other): return self.value > other
+  def __ge__(self, other): return self.value >= other
+  def __eq__(self, other): return self.value == other
+  def __ne__(self, other): return self.value != other
+  def __getitem__(self, item): return self.value[item]
+  def __call__(self, *args, **kwargs): return self.value(*args, **kwargs)
+  def __init_subclass__(cls, **options):
+    super().__init_subclass__()
+    cls._options = options
+  def __new__(*cls_s, **options):
+    cls, s = cls_s
+    assert isinstance(s, str)
+    if cls is choice:
+      cls = _noinit('|'.join(options), (choice,), {}, **options)
+    elif options:
+      raise Exception('{} does not accept keyword arguments'.format(cls.__name__))
+    key, sep, tail = s.partition(':')
+    obj = cls._options[key]
+    if obj is bool:
+      obj = _bool(tail)
+    elif isinstance(obj, type):
+      obj = obj(tail)
+    else:
+      assert not sep
+    self = object.__new__(cls)
+    self.key = key
+    self.value = obj
+    return self
+  def __str__(self):
+    return '{}:{}'.format(self.key, self.value) if isinstance(self._options[self.key], type) else self.key
+
+class unit(float, metaclass=_noinit):
+  _pattern = re.compile('([a-zA-Zα-ωΑ-Ω]+)')
+  def __init_subclass__(cls, **units):
+    super().__init_subclass__()
+    if not units:
+      return
+    remaining = {key: cls._pattern.findall(value) if isinstance(value, str) else 1 for key, value in units.items()}
+    def depth(key):
+      if key not in units:
+        key = key[1:]
+      d = remaining[key]
+      if not isinstance(d, int):
+        del remaining[key] # safeguard for circular refrences
+        remaining[key] = d = sum(map(depth, d))
+      return d
+    cls._units = {}
+    for key in sorted(remaining, key=depth):
+      value = units[key]
+      cls._units[key] = cls._parse(value) if isinstance(value, str) else (value, {key: 1})
+  def __new__(cls, s):
+    v, powers = cls._parse(s)
+    if hasattr(cls, '_powers'):
+      assert cls._powers == powers, 'invalid unit: expected {}, got {}'.format(cls._powers, powers)
+    else:
+      cls = type(''.join(str(s) for item in powers.items() for s in item), (cls,), dict(_powers=powers))
+    self = float.__new__(cls, v)
+    self._str = s
+    return self
+  @classmethod
+  def _parse(cls, s, modifiers=dict(p=1e-9, μ=1e-6, m=1e-3, c=1e-2, d=1e-1, k=1e3, M=1e6, G=1e9)):
+    parts = cls._pattern.split(s)
+    value = float(parts[0].rstrip('*/') or 1)
+    powers = {}
+    for i in range(1, len(parts), 2):
+      s = int(parts[i+1].rstrip('*/') or 1)
+      if parts[i-1].endswith('/'):
+        s = -s
+      key = parts[i]
+      if key not in cls._units:
+        v, p = cls._units[key[1:]]
+        v *= modifiers[key[0]]
+      else:
+        v, p = cls._units[key]
+      value *= v**s
+      powers.update({c: powers.get(c, 0) + n * s for c, n in p.items()})
+    return value, {c: n for c, n in powers.items() if n}
+  def __str__(self):
+    return self._str
