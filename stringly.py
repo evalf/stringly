@@ -198,21 +198,24 @@ class choice(metaclass=_noinit):
   def __init_subclass__(cls, **options):
     super().__init_subclass__()
     cls._options = options
-  def __new__(*cls_s, **options):
-    cls, s = cls_s
+  def __new__(*cls_s_args, **kwargs):
+    cls, s, *args = cls_s_args
     assert isinstance(s, str)
     if cls is choice:
-      cls = _noinit('|'.join(options), (choice,), {}, **options)
-    elif options:
-      raise Exception('{} does not accept keyword arguments'.format(cls.__name__))
+      cls = _noinit('|'.join(kwargs), (choice,), {}, **kwargs)
+      kwargs = {}
     key, sep, tail = s.partition(':')
     obj = cls._options[key]
-    if obj is bool:
-      obj = _bool(tail)
-    elif isinstance(obj, type):
-      obj = obj(tail)
+    if isinstance(obj, type):
+      if args or kwargs:
+        assert not sep
+      else:
+        args = tail,
+      if obj is bool:
+        obj = _bool
+      obj = obj(*args, **kwargs)
     else:
-      assert not sep
+      assert not sep and not args and not kwargs
     self = object.__new__(cls)
     self.key = key
     self.value = obj
