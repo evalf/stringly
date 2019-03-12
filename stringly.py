@@ -138,11 +138,11 @@ class struct(metaclass=_noinit):
     if cls is struct:
       if args:
         raise Exception('{} accepts only keyword arguments'.format(cls.__name__))
-      cls = type('struct:' + ','.join(kwargs), (cls,), {}, **kwargs)
+      cls = type('struct:' + ':'.join(kwargs), (cls,), {}, **kwargs)
     if args:
       if len(args) != 1 or kwargs:
         raise Exception('{} expects either keyword arguments or a single positional string'.format(cls.__name__))
-      for arg in safesplit(args[0], ','):
+      for arg in safesplit(args[0], ':'):
         key, sep, val = arg.partition('=')
         T = cls._types.get(key)
         if not T:
@@ -158,7 +158,7 @@ class struct(metaclass=_noinit):
   def __init__(self, **kwargs):
     self.__dict__.update(kwargs)
   def __str__(self):
-    return ','.join('{}={}'.format(key, protect(self._types[key].__str__(value), ',')) for key, value in sorted(self._args.items()))
+    return ':'.join('{}={}'.format(key, protect(self._types[key].__str__(value), ':')) for key, value in sorted(self._args.items()))
 
 class tuple(builtins.tuple, metaclass=_noinit):
   def __init_subclass__(cls, **types):

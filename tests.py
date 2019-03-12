@@ -79,22 +79,22 @@ class Struct(unittest.TestCase):
   def test_keywordargs(self):
     a = self.A(i=5, f=10., b=False)
     self.check(a, i=5, f=10., b=False)
-    self.assertEqual(str(a), 'b=False,f=10.0,i=5')
+    self.assertEqual(str(a), 'b=False:f=10.0:i=5')
 
   def test_partialkeywordargs(self):
     a = self.A(i=5, f=10.)
     self.check(a, i=5, f=10., b=True)
-    self.assertEqual(str(a), 'b=True,f=10.0,i=5')
+    self.assertEqual(str(a), 'b=True:f=10.0:i=5')
 
   def test_stringarg(self):
-    a = self.A('f=10,i=5,b=no')
+    a = self.A('f=10:i=5:b=no')
     self.check(a, i=5, f=10., b=False)
-    self.assertEqual(str(a), 'b=False,f=10.0,i=5')
+    self.assertEqual(str(a), 'b=False:f=10.0:i=5')
 
   def test_partialstringarg(self):
     a = self.A('i=1')
     self.check(a, i=1, f=2.5, b=True)
-    self.assertEqual(str(a), 'b=True,f=2.5,i=1')
+    self.assertEqual(str(a), 'b=True:f=2.5:i=1')
 
   def test_subclass(self):
     class B(self.A):
@@ -105,7 +105,7 @@ class Struct(unittest.TestCase):
     b = B(i=10)
     self.check(b, i=10, f=2.5, b=True)
     self.assertEqual(b.s, 'foo')
-    self.assertEqual(str(b), 'b=True,f=2.5,i=10,s=foo')
+    self.assertEqual(str(b), 'b=True:f=2.5:i=10:s=foo')
 
 class InlineStruct(Struct):
 
