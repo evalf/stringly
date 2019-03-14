@@ -130,19 +130,19 @@ class Tuple(unittest.TestCase):
     self.check(self.T())
 
   def test_stringarg(self):
-    self.check(self.T('b:1,a:2'), 1., '2')
+    self.check(self.T('b{1},a{2}'), 1., '2')
 
   def test_directarg(self):
     self.check(self.T([1., '2']), 1., '2')
 
   def test_string(self):
     self.assertEqual(str(self.T()), '')
-    self.assertEqual(str(self.T([1., '2'])), 'b:1.0,a:2')
-    self.assertEqual(str(self.T('a:1,b:2')), 'a:1,b:2.0')
+    self.assertEqual(str(self.T([1., '2'])), 'b{1.0},a{2}')
+    self.assertEqual(str(self.T('a{1},b{2}')), 'a{1},b{2.0}')
 
 class InlineTuple(Tuple):
 
-  t = stringly.tuple('b:2', a=str, b=float)
+  t = stringly.tuple('b{2}', a=str, b=float)
   T = t.__class__
 
   def test_instance(self):
@@ -161,15 +161,15 @@ class Choice(unittest.TestCase):
     self.check(self.C('b'), 2)
 
   def test_typeargstring(self):
-    self.check(self.C('a:2.5'), 2.5)
+    self.check(self.C('a{2.5}'), 2.5)
 
   def test_string(self):
-    self.assertEqual(str(self.C('a:1')), 'a:1.0')
+    self.assertEqual(str(self.C('a{1}')), 'a{1.0}')
     self.assertEqual(str(self.C('b')), 'b')
 
 class InlineChoice(Choice):
 
-  c = stringly.choice('a:1', a=float, b=2)
+  c = stringly.choice('a{1}', a=float, b=2)
   C = c.__class__
 
   def test_instance(self):

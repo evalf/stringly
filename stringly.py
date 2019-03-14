@@ -93,9 +93,9 @@ def unescape(escaped):
   assert depth == 0, 'source string is not balanced'
   return s
 
-def protect(s, c):
+def protect(s, c=None):
   s = str(s)
-  if not isnormal(s):
+  if c is None or not isnormal(s):
     return '{' + escape(s) + '}' # always embrace escaped strings to make them normal
   if s.startswith('{') and s.endswith('}'):
     return '{' + s + '}'
@@ -108,6 +108,12 @@ def protect(s, c):
 
 def unprotect(s):
   return unescape(s[1:-1] if s.startswith('{') and s.endswith('}') else s)
+
+def splitarg(s):
+  head, sep, tail = s.partition('{')
+  if sep and not tail.endswith('}'):
+    raise Exception('invalid joined argument {!r}'.format(s))
+  return head, unprotect(sep + tail)
 
 def _bool(s):
   if s.lower() in ('true', 'yes'):
@@ -172,14 +178,14 @@ class tuple(builtins.tuple, metaclass=_noinit):
     assert len(args) <= 1
     items = args and args[0]
     if isinstance(items, str):
-      split = [item.partition(':')[::2] for item in safesplit(items, ',')]
-      items = [cls.types[name](unprotect(args)) for name, args in split]
+      split = map(splitarg, safesplit(items, ','))
+      items = [cls.types[name](args) for name, args in split]
     self = builtins.tuple.__new__(cls, items)
     self.__init__(items)
     return self
   def __str__(self):
     clsname = {cls: name for name, cls in self.__class__.types.items()}
-    return ','.join('{}:{}'.format(clsname[item.__class__], protect(item, ',')) for item in self)
+    return ','.join(clsname[item.__class__] + protect(item) for item in self)
 
 class choice(metaclass=_noinit):
   def __getattr__(self, attr): return getattr(self.value, attr)
@@ -204,24 +210,24 @@ class choice(metaclass=_noinit):
     if cls is choice:
       cls = _noinit('|'.join(kwargs), (choice,), {}, **kwargs)
       kwargs = {}
-    key, sep, tail = s.partition(':')
+    key, arg = splitarg(s)
     obj = cls._options[key]
     if isinstance(obj, type):
       if args or kwargs:
-        assert not sep
+        assert not arg
       else:
-        args = tail,
+        args = arg,
       if obj is bool:
         obj = _bool
       obj = obj(*args, **kwargs)
     else:
-      assert not sep and not args and not kwargs
+      assert not arg and not args and not kwargs
     self = object.__new__(cls)
     self.key = key
     self.value = obj
     return self
   def __str__(self):
-    return '{}:{}'.format(self.key, self.value) if isinstance(self._options[self.key], type) else self.key
+    return self.key + protect(self.value) if isinstance(self._options[self.key], type) else self.key
 
 class unit(float, metaclass=_noinit):
   _pattern = re.compile('([a-zA-Zα-ωΑ-Ω]+)')
