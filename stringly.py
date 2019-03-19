@@ -128,23 +128,21 @@ class _noinit(type):
     return args[0].__new__(*args, **kwargs)
 
 class struct(metaclass=_noinit):
-  def __init_subclass__(cls, **defaults):
+  def __init_subclass__(cls):
     super().__init_subclass__()
-    self, *params = inspect.signature(cls.__init__).parameters.values()
-    defaults.update({param.name: param.default for param in params if param.default is not param.empty})
-    types = {name: default.__class__ for name, default in defaults.items()}
-    types.update({param.name: param.annotation for param in params if param.annotation is not param.empty and callable(param.annotation)})
-    if any(param.kind == param.VAR_KEYWORD for param in params) and hasattr(cls, '_types'):
-      defaults = dict(cls._defaults, **defaults)
-      types = dict(cls._types, **types)
-    cls._defaults = defaults
-    cls._types = types
+    self, *cls._params = inspect.signature(cls.__init__).parameters.values()
+    cls._defaults = {param.name: param.default for param in cls._params if param.default is not param.empty}
+    cls._types = {key: value.__class__ for key, value in cls._defaults.items()}
   def __new__(*cls_args, **kwargs):
     cls, *args = cls_args
     if cls is struct:
       if args:
         raise Exception('{} accepts only keyword arguments'.format(cls.__name__))
-      cls = type('struct:' + ','.join(kwargs), (cls,), {}, **kwargs)
+      self = 'self'
+      while self in kwargs:
+        self += '_'
+      __init__ = eval('lambda {0}, {1}: {0}.__dict__.update({1})'.format(self, ','.join(map('{0}={0}'.format, kwargs))), kwargs.copy())
+      cls = type('struct:' + ','.join(kwargs), (cls,), dict(__init__=__init__))
     if args:
       if len(args) != 1 or kwargs:
         raise Exception('{} expects either keyword arguments or a single positional string'.format(cls.__name__))
@@ -157,14 +155,11 @@ class struct(metaclass=_noinit):
           T = _bool
         kwargs[key] = T(unprotect(val))
     self = object.__new__(cls)
-    self._args = cls._defaults.copy()
-    self._args.update(kwargs)
-    self.__init__(**self._args)
+    self._kwargs = kwargs
+    self.__init__(**kwargs)
     return self
-  def __init__(self, **kwargs):
-    self.__dict__.update(kwargs)
   def __str__(self):
-    return ','.join('{}={}'.format(key, protect(self._types[key].__str__(value), ',')) for key, value in sorted(self._args.items()))
+    return ','.join('{}={}'.format(param.name, protect(self._kwargs.get(param.name, param.default), ',')) for param in self._params)
 
 class tuple(builtins.tuple, metaclass=_noinit):
   def __init_subclass__(cls, **types):
