@@ -62,8 +62,8 @@ class Protect(unittest.TestCase):
 
 class Struct(unittest.TestCase):
 
-  class A(stringly.struct, b=True):
-    def __init__(self, b, i:int, f=2.5):
+  class A(stringly.struct):
+    def __init__(self, b=True, i=1, f=2.5):
       self.b = b
       self.f = f
       self.i = i
@@ -79,41 +79,34 @@ class Struct(unittest.TestCase):
   def test_keywordargs(self):
     a = self.A(i=5, f=10., b=False)
     self.check(a, i=5, f=10., b=False)
-    self.assertEqual(str(a), 'b=False;f=10.0;i=5')
+    self.assertEqual(str(a), 'b=False;i=5;f=10.0')
 
   def test_partialkeywordargs(self):
     a = self.A(i=5, f=10.)
     self.check(a, i=5, f=10., b=True)
-    self.assertEqual(str(a), 'b=True;f=10.0;i=5')
+    self.assertEqual(str(a), 'b=True;i=5;f=10.0')
 
   def test_stringarg(self):
     a = self.A('f=10;i=5;b=no')
     self.check(a, i=5, f=10., b=False)
-    self.assertEqual(str(a), 'b=False;f=10.0;i=5')
+    self.assertEqual(str(a), 'b=False;i=5;f=10.0')
 
   def test_partialstringarg(self):
     a = self.A('i=1')
     self.check(a, i=1, f=2.5, b=True)
-    self.assertEqual(str(a), 'b=True;f=2.5;i=1')
+    self.assertEqual(str(a), 'b=True;i=1;f=2.5')
 
-  def test_subclass(self):
-    class B(self.A):
-      def __init__(_self, s='foo', **kwargs):
-        self.assertEqual(kwargs, dict(i=10, f=2.5, b=True))
-        _self.s = s
-        super().__init__(**kwargs)
-    b = B(i=10)
-    self.check(b, i=10, f=2.5, b=True)
-    self.assertEqual(b.s, 'foo')
-    self.assertEqual(str(b), 'b=True;f=2.5;i=10;s=foo')
+  def test_noarg(self):
+    a = self.A()
+    self.check(a, b=True, i=1, f=2.5)
 
 class InlineStruct(Struct):
 
-  a = stringly.struct(i=10, f=2.5, b=True)
+  a = stringly.struct(b=True, i=1, f=2.5)
   A = a.__class__
 
   def test_instance(self):
-    self.check(self.a, i=10, f=2.5, b=True)
+    self.check(self.a, i=1, f=2.5, b=True)
 
 class Tuple(unittest.TestCase):
 
