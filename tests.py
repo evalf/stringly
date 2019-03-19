@@ -123,15 +123,15 @@ class Tuple(unittest.TestCase):
     self.check(self.T())
 
   def test_stringarg(self):
-    self.check(self.T('b{1},a{2}'), 1., '2')
+    self.check(self.T('b{1}+a{2}'), 1., '2')
 
   def test_directarg(self):
     self.check(self.T([1., '2']), 1., '2')
 
   def test_string(self):
     self.assertEqual(str(self.T()), '')
-    self.assertEqual(str(self.T([1., '2'])), 'b{1.0},a{2}')
-    self.assertEqual(str(self.T('a{1},b{2}')), 'a{1},b{2.0}')
+    self.assertEqual(str(self.T([1., '2'])), 'b{1.0}+a{2}')
+    self.assertEqual(str(self.T('a{1}+b{2}')), 'a{1}+b{2.0}')
 
 class InlineTuple(Tuple):
 

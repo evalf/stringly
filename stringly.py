@@ -167,20 +167,20 @@ class tuple(builtins.tuple, metaclass=_noinit):
     cls.types = types
   def __new__(cls, *args, **types):
     if cls is tuple:
-      cls = type('tuple:' + ','.join(types), (tuple,), {}, **types)
+      cls = type('tuple:' + '+'.join(types), (tuple,), {}, **types)
     elif types:
       raise Exception('{} does not accept keyword arguments'.format(cls.__name__))
     assert len(args) <= 1
     items = args and args[0]
     if isinstance(items, str):
-      split = map(splitarg, safesplit(items, ','))
+      split = map(splitarg, safesplit(items, '+'))
       items = [cls.types[name](args) for name, args in split]
     self = builtins.tuple.__new__(cls, items)
     self.__init__(items)
     return self
   def __str__(self):
     clsname = {cls: name for name, cls in self.__class__.types.items()}
-    return ','.join(clsname[item.__class__] + protect(item) for item in self)
+    return '+'.join(clsname[item.__class__] + protect(item) for item in self)
 
 class choice(metaclass=_noinit):
   def __getattr__(self, attr): return getattr(self.value, attr)
