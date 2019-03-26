@@ -20,7 +20,7 @@
 
 version = '1.0b0'
 
-import builtins, inspect, re
+import builtins, inspect, re, sys, importlib, runpy, contextlib
 
 def safesplit(s, sep):
   if not s:
@@ -271,3 +271,90 @@ class unit(float, metaclass=_noinit):
     return value, {c: n for c, n in powers.items() if n}
   def __str__(self):
     return self._str
+
+class ImportFunctionError(Exception): pass
+
+def import_function(funcpath):
+  if ':' in funcpath:
+    script, funcname = funcpath.rsplit(':', 1)
+    ns = runpy.run_path(script, run_name='<stringly.import_function>')
+    try:
+      func = ns[funcname]
+    except KeyError as e:
+      raise ImportFunctionError('no such function in script {}: {}'.format(script, funcname)) from e
+  else:
+    parts = funcpath.split('.')
+    for i in range(1, len(parts)):
+      mod = importlib.import_module('.'.join(parts[:i]))
+      try:
+        func = getattr(mod, '.'.join(parts[i:]))
+        break
+      except AttributeError:
+        pass
+    else:
+      raise ImportFunctionError('no such function: {}'.format(funcpath))
+  if not callable(func):
+    raise ImportFunctionError('function {!r} is not callable'.format(funcpath))
+  return func
+
+def _run(func=None, argv=None):
+  if argv is None:
+    argv = sys.argv
+
+  if func is None:
+    argv.pop(0)
+    try:
+      func = import_function(argv[0])
+    except ImportFunctionError as e:
+      print(e, file=sys.stderr)
+      raise SystemExit(1) from e
+  else:
+    if not callable(func):
+      raise ValueError("'func' is not callable")
+
+  types = {}
+  mandatory = set()
+
+  sig = inspect.signature(func)
+  for name, param in sig.parameters.items():
+    if param.kind == param.POSITIONAL_ONLY:
+      raise NotImplementedError
+    elif param.kind in (param.POSITIONAL_OR_KEYWORD, param.KEYWORD_ONLY):
+      if param.default != param.empty:
+        arg_type = type(param.default)
+      elif param.annotation != param.empty:
+        arg_type = param.annotation
+        mandatory.add(name)
+      else:
+        raise ValueError
+      if arg_type == bool:
+        arg_type = _bool
+      types[name] = arg_type
+    elif param.kind == param.VAR_POSITIONAL:
+      raise ValueError('var positional arguments are not supported')
+    else:
+      raise NotImplementedError
+
+  args =[]
+  kwargs = {}
+  for arg in argv[1:]:
+    k, sep, v = arg.partition('=')
+    if k not in types:
+      print('unexpected argument {!r}'.format(k), file=sys.stderr)
+      raise SystemExit(1)
+    if not sep:
+      print('argument {!r} requires a value'.format(k), file=sys.stderr)
+      raise SystemExit(1)
+    kwargs[k] = types[k](v)
+  missing = set(mandatory) - set(kwargs)
+  if missing:
+    print('missing required argument(s): {}'.format(','.join(missing)), file=sys.stderr)
+    raise SystemExit(1)
+
+  func(*args, **kwargs)
+
+def run(func, argv=None):
+  _run(func=func, argv=argv)
+
+if __name__ == '__main__':
+  _run()
