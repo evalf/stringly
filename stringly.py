@@ -142,7 +142,7 @@ class struct(metaclass=_noinit):
       while self in kwargs:
         self += '_'
       __init__ = eval('lambda {0}, {1}: {0}.__dict__.update({1})'.format(self, ','.join(map('{0}={0}'.format, kwargs))), kwargs.copy())
-      cls = type('struct:' + ','.join(kwargs), (cls,), dict(__init__=__init__))
+      cls = type('struct:' + ','.join(kwargs), (cls,), builtins.dict(__init__=__init__))
     if args:
       if len(args) != 1 or kwargs:
         raise Exception('{} expects either keyword arguments or a single positional string'.format(cls.__name__))
@@ -181,6 +181,33 @@ class tuple(builtins.tuple, metaclass=_noinit):
   def __str__(self):
     clsname = {cls: name for name, cls in self.__class__.types.items()}
     return ','.join(clsname[item.__class__] + protect(item) for item in self)
+
+class dict(builtins.dict, metaclass=_noinit):
+  def __init_subclass__(cls, **types):
+    super().__init_subclass__()
+    cls.types = types
+  def __new__(cls, *args, **types):
+    if cls is dict:
+      cls = type('dict:' + ','.join(types), (dict,), {}, **types)
+    elif types:
+      raise Exception('{} does not accept keyword arguments'.format(cls.__name__))
+    assert len(args) <= 1
+    if not args:
+      items = []
+    elif isinstance(args[0], str):
+      items = []
+      for item in safesplit(args[0], ','):
+        key, nameargs = safesplit(item, '=')
+        name, args = splitarg(nameargs)
+        items.append([unprotect(key), cls.types[name](args)])
+    else:
+      items = args[0]
+    self = builtins.dict.__new__(cls, items)
+    self.__init__(items)
+    return self
+  def __str__(self):
+    clsname = {cls: name for name, cls in self.__class__.types.items()}
+    return ','.join('{}={}{}'.format(protect(key, '='), clsname[val.__class__], protect(val)) for key, val in self.items())
 
 class choice(metaclass=_noinit):
   def __getattr__(self, attr): return getattr(self.value, attr)
@@ -248,12 +275,12 @@ class unit(float, metaclass=_noinit):
     if hasattr(cls, '_powers'):
       assert cls._powers == powers, 'invalid unit: expected {}, got {}'.format(cls._powers, powers)
     else:
-      cls = type(''.join(str(s) for item in powers.items() for s in item), (cls,), dict(_powers=powers))
+      cls = type(''.join(str(s) for item in powers.items() for s in item), (cls,), builtins.dict(_powers=powers))
     self = float.__new__(cls, v)
     self._str = s
     return self
   @classmethod
-  def _parse(cls, s, modifiers=dict(p=1e-9, μ=1e-6, m=1e-3, c=1e-2, d=1e-1, k=1e3, M=1e6, G=1e9)):
+  def _parse(cls, s, modifiers=builtins.dict(p=1e-9, μ=1e-6, m=1e-3, c=1e-2, d=1e-1, k=1e3, M=1e6, G=1e9)):
     parts = cls._pattern.split(s)
     value = float(parts[0].rstrip('*/') or 1)
     powers = {}
