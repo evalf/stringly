@@ -141,6 +141,43 @@ class InlineTuple(Tuple):
   def test_instance(self):
     self.check(self.t, 2.)
 
+class Dict(unittest.TestCase):
+
+  class T(stringly.dict, a=str, b=float):
+    pass
+
+  def check(*args, **values):
+    self, t = args
+    self.assertEqual(len(t), len(values))
+    for k, v in values.items():
+      self.assertEqual(t[k], v)
+      self.assertIsInstance(t[k], v.__class__)
+
+  def test_defaults(self):
+    self.check(self.T())
+
+  def test_stringarg(self):
+    self.check(self.T('x=b{1},y=a{2}'), **{'x': 1., 'y': '2'})
+    self.check(self.T('{{}x}=a{1=},{y=}=b{2}'), **{'{x': '1=', 'y=': 2.})
+
+  def test_directarg(self):
+    self.check(self.T({'x': 1., 'y': '2'}), **{'x': 1., 'y': '2'})
+    self.check(self.T({'{x': '1=', 'y=': 2.}), **{'{x': '1=', 'y=': 2.})
+
+  def test_string(self):
+    self.assertEqual(str(self.T()), '')
+    self.assertEqual(str(self.T(dict(x=1., y='2'))), 'x=b{1.0},y=a{2}')
+    self.assertEqual(str(self.T('x=a{1},y=b{2}')), 'x=a{1},y=b{2.0}')
+    self.assertEqual(str(self.T('{{}x}=a{1=},{y=}=b{2}')), '{{}x}=a{1=},{y=}=b{2.0}')
+
+class InlineDict(Dict):
+
+  t = stringly.dict('x=b{2}', a=str, b=float)
+  T = t.__class__
+
+  def test_instance(self):
+    self.check(self.t, x=2.)
+
 class Choice(unittest.TestCase):
 
   class C(stringly.choice, a=float, b=2):
