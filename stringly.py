@@ -146,7 +146,7 @@ class struct(metaclass=_noinit):
     if args:
       if len(args) != 1 or kwargs:
         raise Exception('{} expects either keyword arguments or a single positional string'.format(cls.__name__))
-      for arg in safesplit(args[0], ';'):
+      for arg in safesplit(args[0], ','):
         key, sep, val = arg.partition('=')
         T = cls._types.get(key)
         if not T:
@@ -159,7 +159,7 @@ class struct(metaclass=_noinit):
     self.__init__(**kwargs)
     return self
   def __str__(self):
-    return ';'.join('{}={}'.format(param.name, protect(self._kwargs.get(param.name, param.default), ';')) for param in self._params)
+    return ','.join('{}={}'.format(param.name, protect(self._kwargs.get(param.name, param.default), ',')) for param in self._params)
 
 class tuple(builtins.tuple, metaclass=_noinit):
   def __init_subclass__(cls, **types):
