@@ -300,6 +300,45 @@ class unit(float, metaclass=_noinit):
   def __str__(self):
     return self._str
 
+def prettify(uggly):
+  return _prettify(uggly, '')
+
+def _prettify(uggly, indent):
+  pretty = ''
+  for part in safesplit(uggly, ','):
+    i = part.find('{')
+    if i > 0 and part.endswith('}') and isnormal(part[i+1:-1]):
+      scope = _prettify(part[i+1:-1], indent+'  ')
+      part = part[:i]
+    else:
+      scope = ''
+    part = protect(part) if part.startswith(' ') else protect(part, '\n')
+    pretty += indent+part+'\n'+scope
+  return pretty
+
+def ugglify(pretty):
+  uggly = ''
+  for lineno, line in enumerate(safesplit(pretty, '\n'), 1):
+    if not line:
+      continue
+    stripped = line.lstrip(' ')
+    indent = len(line) - len(stripped)
+    if not uggly:
+      indents = [indent]
+    elif indent > indents[-1]:
+      uggly += '{'
+      indents.append(indent)
+    else:
+      while indents and indents[-1] != indent:
+        indents.pop()
+        uggly += '}'
+      if not indents or indent < indents[-1]:
+        raise ValueError('line {}: dedent does not match previous indentation'.format(lineno))
+      uggly += ','
+    uggly += unprotect(stripped)
+  uggly += '}'*(len(indents)-1)
+  return uggly
+
 class ImportFunctionError(Exception): pass
 
 def import_function(funcpath):
