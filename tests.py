@@ -79,22 +79,22 @@ class Struct(unittest.TestCase):
   def test_keywordargs(self):
     a = self.A(i=5, f=10., b=False)
     self.check(a, i=5, f=10., b=False)
-    self.assertEqual(str(a), 'b=False;i=5;f=10.0')
+    self.assertEqual(str(a), 'b=False,i=5,f=10.0')
 
   def test_partialkeywordargs(self):
     a = self.A(i=5, f=10.)
     self.check(a, i=5, f=10., b=True)
-    self.assertEqual(str(a), 'b=True;i=5;f=10.0')
+    self.assertEqual(str(a), 'b=True,i=5,f=10.0')
 
   def test_stringarg(self):
-    a = self.A('f=10;i=5;b=no')
+    a = self.A('f=10,i=5,b=no')
     self.check(a, i=5, f=10., b=False)
-    self.assertEqual(str(a), 'b=False;i=5;f=10.0')
+    self.assertEqual(str(a), 'b=False,i=5,f=10.0')
 
   def test_partialstringarg(self):
     a = self.A('i=1')
     self.check(a, i=1, f=2.5, b=True)
-    self.assertEqual(str(a), 'b=True;i=1;f=2.5')
+    self.assertEqual(str(a), 'b=True,i=1,f=2.5')
 
   def test_noarg(self):
     a = self.A()
@@ -241,3 +241,42 @@ class Unit(unittest.TestCase):
   def test_pressure(self):
     self.check('Pa', 1, g=1, m=-1, s=-2)
     self.check('10000lb/in/h2', 453.59237/25.4/36**2, g=1, m=-1, s=-2)
+
+class PrettifyUgglify(unittest.TestCase):
+
+  def check(self, uggly, pretty):
+    self.assertEqual(stringly.prettify(uggly), pretty)
+    self.assertEqual(stringly.ugglify(pretty), uggly)
+
+  def test_normal(self):
+    self.check('a=1,b=c', 'a=1\nb=c\n')
+    self.check('a=b{c,d}', 'a=b\n  c\n  d\n')
+    self.check('a=b{c=d,e{f,g}},h=i', 'a=b\n  c=d\n  e\n    f\n    g\nh=i\n')
+
+  def test_leading_whitespace(self):
+    self.check(' ', '{ }\n')
+    self.check(' a', '{ a}\n')
+    self.check('a={ ,c}', 'a=\n  { }\n  c\n')
+
+  def test_newline(self):
+    self.check('\n', '{\n}\n')
+    self.check('\na', '{\na}\n')
+    self.check('a={\n,c}', 'a=\n  {\n}\n  c\n')
+
+  def test_embraced(self):
+    self.check('{}', '{{}}{}\n')
+    self.check('{a}', '{{a}}\n')
+
+  def test_unbalanced(self):
+    self.check('}', '{}{}\n')
+    self.check('{', '{{}}\n')
+
+  def test_double_scope(self):
+    self.check('a{b}c{d}', 'a{b}c{d}\n')
+
+  def test_all_indented(self):
+    self.assertEqual(stringly.ugglify('  a=b\n  c=\n    d\n'), 'a=b,c={d}')
+
+  def test_invalid_dedent(self):
+    with self.assertRaisesRegex(ValueError, 'line 3: dedent does not match previous indentation'):
+      stringly.ugglify('a=\n  b\n c\n')

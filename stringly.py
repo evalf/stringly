@@ -146,7 +146,7 @@ class struct(metaclass=_noinit):
     if args:
       if len(args) != 1 or kwargs:
         raise Exception('{} expects either keyword arguments or a single positional string'.format(cls.__name__))
-      for arg in safesplit(args[0], ';'):
+      for arg in safesplit(args[0], ','):
         key, sep, val = arg.partition('=')
         T = cls._types.get(key)
         if not T:
@@ -159,7 +159,7 @@ class struct(metaclass=_noinit):
     self.__init__(**kwargs)
     return self
   def __str__(self):
-    return ';'.join('{}={}'.format(param.name, protect(self._kwargs.get(param.name, param.default), ';')) for param in self._params)
+    return ','.join('{}={}'.format(param.name, protect(self._kwargs.get(param.name, param.default), ',')) for param in self._params)
 
 class tuple(builtins.tuple, metaclass=_noinit):
   def __init_subclass__(cls, **types):
@@ -299,6 +299,45 @@ class unit(float, metaclass=_noinit):
     return value, {c: n for c, n in powers.items() if n}
   def __str__(self):
     return self._str
+
+def prettify(uggly):
+  return _prettify(uggly, '')
+
+def _prettify(uggly, indent):
+  pretty = ''
+  for part in safesplit(uggly, ','):
+    i = part.find('{')
+    if i > 0 and part.endswith('}') and isnormal(part[i+1:-1]):
+      scope = _prettify(part[i+1:-1], indent+'  ')
+      part = part[:i]
+    else:
+      scope = ''
+    part = protect(part) if part.startswith(' ') else protect(part, '\n')
+    pretty += indent+part+'\n'+scope
+  return pretty
+
+def ugglify(pretty):
+  uggly = ''
+  for lineno, line in enumerate(safesplit(pretty, '\n'), 1):
+    if not line:
+      continue
+    stripped = line.lstrip(' ')
+    indent = len(line) - len(stripped)
+    if not uggly:
+      indents = [indent]
+    elif indent > indents[-1]:
+      uggly += '{'
+      indents.append(indent)
+    else:
+      while indents and indents[-1] != indent:
+        indents.pop()
+        uggly += '}'
+      if not indents or indent < indents[-1]:
+        raise ValueError('line {}: dedent does not match previous indentation'.format(lineno))
+      uggly += ','
+    uggly += unprotect(stripped)
+  uggly += '}'*(len(indents)-1)
+  return uggly
 
 class ImportFunctionError(Exception): pass
 
