@@ -223,6 +223,7 @@ class choice(metaclass=_noinit):
   def __ne__(self, other): return self.value != other
   def __getitem__(self, item): return self.value[item]
   def __call__(self, *args, **kwargs): return self.value(*args, **kwargs)
+  def __iter__(self): yield from self.value
   def __init_subclass__(cls, **options):
     super().__init_subclass__()
     cls._options = options
