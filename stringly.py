@@ -313,20 +313,28 @@ def _prettify(uggly, indent):
       part = part[:i]
     else:
       scope = ''
-    part = protect(part) if part.startswith(' ') else protect(part, '\n')
-    pretty += indent+part+'\n'+scope
+    if part.startswith((' ', '>|')) or '\n' in part:
+      pretty += indent+'>|'+part.replace('\n', '\n'+indent+' |')
+    else:
+      pretty += indent+part
+    pretty += '\n'+scope
   return pretty
 
 def ugglify(pretty):
   uggly = ''
-  for lineno, line in enumerate(safesplit(pretty, '\n'), 1):
+  lines = pretty.split('\n')
+  i = 0
+  while i < len(lines):
+    line = lines[i]
     if not line:
+      i += 1
       continue
-    stripped = line.lstrip(' ')
-    indent = len(line) - len(stripped)
+    indent = len(line) - len(line.lstrip(' '))
     if not uggly:
       indents = [indent]
     elif indent > indents[-1]:
+      if indent - indents[-1] == 1:
+        raise ValueError('line {}: indentation should be two or more spaces but got one'.format(i+1))
       uggly += '{'
       indents.append(indent)
     else:
@@ -334,9 +342,17 @@ def ugglify(pretty):
         indents.pop()
         uggly += '}'
       if not indents or indent < indents[-1]:
-        raise ValueError('line {}: dedent does not match previous indentation'.format(lineno))
+        raise ValueError('line {}: dedent does not match previous indentation'.format(i+1))
       uggly += ','
-    uggly += unprotect(stripped)
+    if line.startswith(' '*indent+'>|'):
+      uggly += line[indent+2:]
+      i += 1
+      while i < len(lines) and lines[i].startswith(' '*indent+' |'):
+        uggly += '\n'+lines[i][indent+2:]
+        i += 1
+    else:
+      uggly += line[indent:]
+      i += 1
   uggly += '}'*(len(indents)-1)
   return uggly
 

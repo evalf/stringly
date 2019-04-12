@@ -254,22 +254,26 @@ class PrettifyUgglify(unittest.TestCase):
     self.check('a=b{c=d,e{f,g}},h=i', 'a=b\n  c=d\n  e\n    f\n    g\nh=i\n')
 
   def test_leading_whitespace(self):
-    self.check(' ', '{ }\n')
-    self.check(' a', '{ a}\n')
-    self.check('a={ ,c}', 'a=\n  { }\n  c\n')
+    self.check(' ', '>| \n')
+    self.check(' a', '>| a\n')
+    self.check('a={ ,c}', 'a=\n  >| \n  c\n')
 
   def test_newline(self):
-    self.check('\n', '{\n}\n')
-    self.check('\na', '{\na}\n')
-    self.check('a={\n,c}', 'a=\n  {\n}\n  c\n')
+    self.check('\n', '>|\n |\n')
+    self.check('\na', '>|\n |a\n')
+    self.check('a={\n,c}', 'a=\n  >|\n   |\n  c\n')
 
-  def test_embraced(self):
-    self.check('{}', '{{}}{}\n')
-    self.check('{a}', '{{a}}\n')
+  def test_startswith_escape(self):
+    self.check('>|', '>|>|\n')
 
-  def test_unbalanced(self):
-    self.check('}', '{}{}\n')
-    self.check('{', '{{}}\n')
+  def test_startswith_continuation(self):
+    self.check(' >', '>| >\n')
+
+  def test_consecutive_escape(self):
+    self.check('a={ b,\nc}', 'a=\n  >| b\n  >|\n   |c\n')
+
+  def test_escape_indent(self):
+    self.check('a={ b{c},d}', 'a=\n  >| b\n    c\n  d\n')
 
   def test_double_scope(self):
     self.check('a{b}c{d}', 'a{b}c{d}\n')
@@ -280,3 +284,9 @@ class PrettifyUgglify(unittest.TestCase):
   def test_invalid_dedent(self):
     with self.assertRaisesRegex(ValueError, 'line 3: dedent does not match previous indentation'):
       stringly.ugglify('a=\n  b\n c\n')
+
+  def test_invalid_indent(self):
+    with self.assertRaisesRegex(ValueError, 'line 2: indentation should be two or more spaces but got one'):
+      stringly.ugglify('a=\n b\n')
+    with self.assertRaisesRegex(ValueError, 'line 3: indentation should be two or more spaces but got one'):
+      stringly.ugglify('a=\n  >|\n   b\n')
