@@ -1,13 +1,18 @@
-import stringly, unittest
+import stringly, unittest, typing, enum, decimal, sys, textwrap
+
+if sys.version_info >= (3,7):
+  import dataclasses
+else:
+  dataclasses = None
 
 class Escape(unittest.TestCase):
 
   def assertEscaped(self, orig, normal=None):
     if normal is not None:
-      self.assertEqual(stringly.escape(orig), normal)
+      self.assertEqual(stringly.util.escape(orig), normal)
     else:
-      normal = stringly.escape(orig)
-    self.assertEqual(stringly.unescape(normal), orig)
+      normal = stringly.util.escape(orig)
+    self.assertEqual(stringly.util.unescape(normal), orig)
 
   def test_combinations(self):
     for length in range(6):
@@ -32,11 +37,11 @@ class Protect(unittest.TestCase):
 
   def assertProtected(self, orig, protected=None, sep=','):
     if protected is not None:
-      self.assertEqual(stringly.protect(orig, sep), protected)
+      self.assertEqual(stringly.util.protect(orig, sep), protected)
     else:
-      protected = stringly.protect(orig, sep)
-    self.assertEqual(stringly.safesplit(protected, sep), [protected] if orig else [])
-    self.assertEqual(stringly.unprotect(protected), orig)
+      protected = stringly.util.protect(orig, sep)
+    self.assertEqual(stringly.util.safesplit(protected, sep), [protected] if orig else [])
+    self.assertEqual(stringly.util.unprotect(protected), orig)
 
   def test_combinations(self):
     for length in range(6):
@@ -60,193 +65,11 @@ class Protect(unittest.TestCase):
     self.assertProtected('}abc', '{}{abc}')
     self.assertProtected('abc{', '{abc{}}')
 
-class Struct(unittest.TestCase):
+class PrettifyUglify(unittest.TestCase):
 
-  class A(stringly.struct):
-    def __init__(self, b=True, i=1, f=2.5):
-      self.b = b
-      self.f = f
-      self.i = i
-
-  def check(self, a, *, i, f, b):
-    self.assertIsInstance(a.i, int)
-    self.assertEqual(a.i, i)
-    self.assertIsInstance(a.f, float)
-    self.assertEqual(a.f, f)
-    self.assertIsInstance(a.b, bool)
-    self.assertEqual(a.b, b)
-
-  def test_keywordargs(self):
-    a = self.A(i=5, f=10., b=False)
-    self.check(a, i=5, f=10., b=False)
-    self.assertEqual(str(a), 'b=False,i=5,f=10.0')
-
-  def test_partialkeywordargs(self):
-    a = self.A(i=5, f=10.)
-    self.check(a, i=5, f=10., b=True)
-    self.assertEqual(str(a), 'b=True,i=5,f=10.0')
-
-  def test_stringarg(self):
-    a = self.A('f=10,i=5,b=no')
-    self.check(a, i=5, f=10., b=False)
-    self.assertEqual(str(a), 'b=False,i=5,f=10.0')
-
-  def test_partialstringarg(self):
-    a = self.A('i=1')
-    self.check(a, i=1, f=2.5, b=True)
-    self.assertEqual(str(a), 'b=True,i=1,f=2.5')
-
-  def test_noarg(self):
-    a = self.A()
-    self.check(a, b=True, i=1, f=2.5)
-
-class InlineStruct(Struct):
-
-  a = stringly.struct(b=True, i=1, f=2.5)
-  A = a.__class__
-
-  def test_instance(self):
-    self.check(self.a, i=1, f=2.5, b=True)
-
-class Tuple(unittest.TestCase):
-
-  class T(stringly.tuple, a=str, b=float):
-    pass
-
-  def check(self, t, *values):
-    self.assertEqual(len(t), len(values))
-    for i, v in enumerate(values):
-      self.assertEqual(t[i], v)
-      self.assertIsInstance(t[i], v.__class__)
-
-  def test_defaults(self):
-    self.check(self.T())
-
-  def test_stringarg(self):
-    self.check(self.T('b{1},a{2}'), 1., '2')
-
-  def test_directarg(self):
-    self.check(self.T([1., '2']), 1., '2')
-
-  def test_string(self):
-    self.assertEqual(str(self.T()), '')
-    self.assertEqual(str(self.T([1., '2'])), 'b{1.0},a{2}')
-    self.assertEqual(str(self.T('a{1},b{2}')), 'a{1},b{2.0}')
-
-class InlineTuple(Tuple):
-
-  t = stringly.tuple('b{2}', a=str, b=float)
-  T = t.__class__
-
-  def test_instance(self):
-    self.check(self.t, 2.)
-
-class Dict(unittest.TestCase):
-
-  class T(stringly.dict, a=str, b=float):
-    pass
-
-  def check(*args, **values):
-    self, t = args
-    self.assertEqual(len(t), len(values))
-    for k, v in values.items():
-      self.assertEqual(t[k], v)
-      self.assertIsInstance(t[k], v.__class__)
-
-  def test_defaults(self):
-    self.check(self.T())
-
-  def test_stringarg(self):
-    self.check(self.T('x=b{1},y=a{2}'), **{'x': 1., 'y': '2'})
-    self.check(self.T('{{}x}=a{1=},{y=}=b{2}'), **{'{x': '1=', 'y=': 2.})
-
-  def test_directarg(self):
-    self.check(self.T({'x': 1., 'y': '2'}), **{'x': 1., 'y': '2'})
-    self.check(self.T({'{x': '1=', 'y=': 2.}), **{'{x': '1=', 'y=': 2.})
-
-  def test_string(self):
-    self.assertEqual(str(self.T()), '')
-    self.assertEqual(str(self.T(dict(x=1., y='2'))), 'x=b{1.0},y=a{2}')
-    self.assertEqual(str(self.T('x=a{1},y=b{2}')), 'x=a{1},y=b{2.0}')
-    self.assertEqual(str(self.T('{{}x}=a{1=},{y=}=b{2}')), '{{}x}=a{1=},{y=}=b{2.0}')
-
-class InlineDict(Dict):
-
-  t = stringly.dict('x=b{2}', a=str, b=float)
-  T = t.__class__
-
-  def test_instance(self):
-    self.check(self.t, x=2.)
-
-class Choice(unittest.TestCase):
-
-  class C(stringly.choice, a=float, b=2):
-    pass
-
-  def check(self, c, expect):
-    self.assertEqual(c, expect)
-    self.assertIsInstance(c.value, expect.__class__)
-
-  def test_objarg(self):
-    self.check(self.C('b'), 2)
-
-  def test_typeargstring(self):
-    self.check(self.C('a{2.5}'), 2.5)
-
-  def test_string(self):
-    self.assertEqual(str(self.C('a{1}')), 'a{1.0}')
-    self.assertEqual(str(self.C('b')), 'b')
-
-class InlineChoice(Choice):
-
-  c = stringly.choice('a{1}', a=float, b=2)
-  C = c.__class__
-
-  def test_instance(self):
-    self.check(self.c, 1.)
-
-class Unit(unittest.TestCase):
-
-  class U(stringly.unit, m=1, s=1, g=1e-3, Pa='N/m2', N='kg*m*s-2', lb='453.59237g', h='3600s', **{'in': '.0254m'}):
-    pass
-
-  def check(self, *args, **powers):
-    s, v = args
-    u = self.U(s)
-    self.assertEqual(u, v)
-    U = u.__class__
-    self.assertEqual(U._powers, powers)
-    self.assertEqual(U(s), v)
-
-  def test_length(self):
-    self.check('m', 1, m=1)
-    self.check('10in', .254, m=1)
-
-  def test_mass(self):
-    self.check('kg', 1, g=1)
-    self.check('1lb', .45359237, g=1)
-
-  def test_time(self):
-    self.check('s', 1, s=1)
-    self.check('.5h', 1800, s=1)
-
-  def test_velocity(self):
-    self.check('m/s', 1, m=1, s=-1)
-    self.check('km/h', 1/3.6, m=1, s=-1)
-
-  def test_force(self):
-    self.check('N', 1, g=1, m=1, s=-2)
-    self.check('100Pa*in2', .254**2, g=1, m=1, s=-2)
-
-  def test_pressure(self):
-    self.check('Pa', 1, g=1, m=-1, s=-2)
-    self.check('10000lb/in/h2', 453.59237/25.4/36**2, g=1, m=-1, s=-2)
-
-class PrettifyUgglify(unittest.TestCase):
-
-  def check(self, uggly, pretty):
-    self.assertEqual(stringly.prettify(uggly), pretty)
-    self.assertEqual(stringly.ugglify(pretty), uggly)
+  def check(self, s, pretty):
+    self.assertEqual(stringly.util.prettify(s), pretty)
+    self.assertEqual(stringly.util.deprettify(pretty), s)
 
   def test_normal(self):
     self.check('a=1,b=c', 'a=1\nb=c\n')
@@ -279,14 +102,276 @@ class PrettifyUgglify(unittest.TestCase):
     self.check('a{b}c{d}', 'a{b}c{d}\n')
 
   def test_all_indented(self):
-    self.assertEqual(stringly.ugglify('  a=b\n  c=\n    d\n'), 'a=b,c={d}')
+    self.assertEqual(stringly.util.deprettify('  a=b\n  c=\n    d\n'), 'a=b,c={d}')
 
   def test_invalid_dedent(self):
     with self.assertRaisesRegex(ValueError, 'line 3: dedent does not match previous indentation'):
-      stringly.ugglify('a=\n  b\n c\n')
+      stringly.util.deprettify('a=\n  b\n c\n')
 
   def test_invalid_indent(self):
     with self.assertRaisesRegex(ValueError, 'line 2: indentation should be two or more spaces but got one'):
-      stringly.ugglify('a=\n b\n')
+      stringly.util.deprettify('a=\n b\n')
     with self.assertRaisesRegex(ValueError, 'line 3: indentation should be two or more spaces but got one'):
-      stringly.ugglify('a=\n  >|\n   b\n')
+      stringly.util.deprettify('a=\n  >|\n   b\n')
+
+class Bool(unittest.TestCase):
+
+  def test_loads(self):
+    self.assertEqual(stringly.loads(bool, 'True'), True)
+    self.assertEqual(stringly.loads(bool, 'true'), True)
+    self.assertEqual(stringly.loads(bool, 'yes'), True)
+    self.assertEqual(stringly.loads(bool, 'YES'), True)
+    self.assertEqual(stringly.loads(bool, 'False'), False)
+    self.assertEqual(stringly.loads(bool, 'false'), False)
+    self.assertEqual(stringly.loads(bool, 'no'), False)
+    self.assertEqual(stringly.loads(bool, 'NO'), False)
+
+  def test_dumps(self):
+    self.assertEqual(stringly.dumps(bool, True), 'True')
+    self.assertEqual(stringly.dumps(bool, False), 'False')
+
+class Int(unittest.TestCase):
+
+  def test_loads(self):
+    self.assertEqual(stringly.loads(int, '1'), 1)
+    with self.assertRaises(stringly.error.SerializationError):
+      stringly.loads(int, '1.')
+    with self.assertRaises(stringly.error.SerializationError):
+      stringly.loads(int, '1a')
+
+  def test_dumps_bool(self):
+    self.assertEqual(stringly.dumps(int, True), '1')
+
+  def test_dumps_int(self):
+    self.assertEqual(stringly.dumps(int, 1), '1')
+
+  def test_dumps_float(self):
+    with self.assertRaisesRegex(stringly.error.SerializationError, '1.0 .* is not an instance of int'):
+      stringly.dumps(int, 1.0)
+
+  def test_dumps_complex(self):
+    with self.assertRaisesRegex(stringly.error.SerializationError, '1j .* is not an instance of int'):
+      stringly.dumps(int, 1j)
+
+class Float(unittest.TestCase):
+
+  def test_loads(self):
+    self.assertEqual(stringly.loads(float, '1'), 1)
+    with self.assertRaises(stringly.error.SerializationError):
+      stringly.loads(float, '1a')
+
+  def test_dumps_bool(self):
+    self.assertEqual(stringly.dumps(float, True), '1')
+
+  def test_dumps_int(self):
+    self.assertEqual(stringly.dumps(float, 1), '1')
+
+  def test_dumps_float(self):
+    self.assertEqual(stringly.dumps(float, 1.0), '1')
+    self.assertEqual(stringly.dumps(float, 1.2), '1.2')
+    self.assertEqual(stringly.dumps(float, 0.2), '0.2')
+
+  def test_dumps_complex(self):
+    with self.assertRaisesRegex(stringly.error.SerializationError, '1j .* is not an instance of float'):
+      stringly.dumps(float, 1j)
+
+class Complex(unittest.TestCase):
+
+  def test_loads(self):
+    self.assertEqual(stringly.loads(complex, '1+2j'), 1+2j)
+    with self.assertRaises(stringly.error.SerializationError):
+      stringly.loads(complex, '1a')
+
+  def test_dumps_bool(self):
+    self.assertEqual(stringly.dumps(complex, True), '1')
+
+  def test_dumps_int(self):
+    self.assertEqual(stringly.dumps(complex, 1), '1')
+
+  def test_dumps_float(self):
+    self.assertEqual(stringly.dumps(complex, 1.0), '1')
+
+  def test_dumps_complex(self):
+    self.assertEqual(stringly.dumps(complex, 1j), '1j')
+    self.assertEqual(stringly.dumps(complex, 1+0j), '1')
+    self.assertEqual(stringly.dumps(complex, 1+2j), '1+2j')
+
+class Typing(unittest.TestCase):
+
+  def check(self, t, v, s):
+    self.assertEqual(stringly.dumps(t, v), s)
+    self.assertEqual(stringly.loads(t, s), v)
+
+  def test_decimal(self):
+    self.check(decimal.Decimal, decimal.Decimal('1.2'), '1.2')
+
+  def test_tuple(self):
+    self.check(typing.Tuple[str], ('',), '{}')
+    self.check(typing.Tuple[str], ('1',), '1')
+    self.check(typing.Tuple[int,complex], (1,2j), '1,2j')
+
+  def test_uniform_tuple(self):
+    self.check(typing.Tuple[str,...], (), '')
+    self.check(typing.Tuple[str,...], ('',), '{}')
+    self.check(typing.Tuple[int,...], (1,), '1')
+    self.check(typing.Tuple[int,...], (1,2), '1,2')
+
+  def test_list(self):
+    self.check(typing.List[str], [], '')
+    self.check(typing.List[str], [''], '{}')
+    self.check(typing.List[int], [1], '1')
+    self.check(typing.List[int], [1,2], '1,2')
+
+  def test_set(self):
+    self.check(typing.Set[str], set(), '')
+    self.check(typing.Set[str], {''}, '{}')
+    self.check(typing.Set[int], {1}, '1')
+    self.check(typing.Set[int], {1,2}, '1,2')
+
+  def test_frozenset(self):
+    self.check(typing.FrozenSet[str], frozenset(), '')
+    self.check(typing.FrozenSet[str], frozenset({''}), '{}')
+    self.check(typing.FrozenSet[int], frozenset({1}), '1')
+    self.check(typing.FrozenSet[int], frozenset({1,2}), '1,2')
+
+  def test_dict(self):
+    self.check(typing.Dict[str,int], {}, '')
+    self.check(typing.Dict[str,int], {'a': 1}, 'a=1')
+    self.check(typing.Dict[str,str], {'a=': '=1'}, '{a=}==1')
+    self.check(typing.Dict[str,str], {'a,': ',1'}, '{a,}={,1}')
+    self.check(typing.Dict[int,complex], {1: 2j}, '1=2j')
+
+  def test_union(self):
+    self.check(typing.Union[str,int,complex], '1', 'str{1}')
+    self.check(typing.Union[str,int,complex], 1, 'int{1}')
+    self.check(typing.Union[str,complex,int], 1, 'complex{1}')
+    self.check(typing.Union[str,int,complex], 2j, 'complex{2j}')
+
+  def test_union_empty_value(self):
+    self.check(typing.Union[str,complex], '', 'str')
+
+  def test_optional(self):
+    self.check(typing.Optional[str], '1', '1')
+    self.check(typing.Optional[str], '', '{}')
+    self.check(typing.Optional[int], 1, '1')
+
+  def test_optional_union(self):
+    self.check(typing.Optional[typing.Union[str,int]], '1', 'str{1}')
+    self.check(typing.Optional[typing.Union[str,int]], 1, 'int{1}')
+    self.check(typing.Optional[typing.Union[str,int]], None, '')
+    self.check(typing.Optional[typing.Union[str,int]], '', 'str')
+
+  def test_optional_empty_value(self):
+    self.check(typing.Optional[str], None, '')
+    self.check(typing.Optional[int], None, '')
+
+  def test_dataclass(self):
+    if not dataclasses:
+      self.skipTest('module dataclasses unavailable for python < 3.7')
+    t = dataclasses.make_dataclass('t', [('a', int), ('b', str, dataclasses.field(default='2'))])
+    self.check(t, t(a=1, b='2,3'), 'a=1,b={2,3}')
+    self.assertEqual(stringly.loads(t, 'a=1'), t(a=1))
+
+  def test_namedtuple(self):
+    if sys.version_info < (3,6,1):
+      self.skipTest('NamedTuple not support by stringly for Python < 3.6.1')
+    l = {}
+    exec(textwrap.dedent('''
+      class t(typing.NamedTuple):
+        a: int
+        b: str = '2'
+      '''), globals(), l)
+    t = l['t']
+    self.check(t, t(a=1, b='2,3'), 'a=1,b={2,3}')
+    self.assertEqual(stringly.loads(t, 'a=1'), t(a=1))
+
+  def test_newarg(self):
+    class t:
+      def __init__(self, a = 1, b: complex = 2j):
+        self.a = a
+        self.b = b
+      def __getnewargs_ex__(self):
+        return (self.a, self.b), {}
+      def __eq__(self, other):
+        return type(self) == type(other) and self.a == other.a and self.b == other.b
+    self.check(t, t(), 'a=1,b=2j')
+
+  def test_positional(self):
+    import inspect
+    class t:
+      def __init__(self, a: int, b: float):
+        self.a = a
+        self.b = b
+      __init__.__signature__ = inspect.Signature([
+        inspect.Parameter('self', inspect.Parameter.POSITIONAL_ONLY),
+        inspect.Parameter('a', inspect.Parameter.POSITIONAL_ONLY, annotation=int),
+        inspect.Parameter('b', inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=float)])
+      def __getnewargs__(self):
+        return self.a, self.b
+      def __eq__(self, other):
+        return isinstance(other, t) and self.a == other.a and self.b == other.b
+    self.check(t, t(1,2.), '1,b=2')
+
+  def test_enum(self):
+    class t(enum.Enum):
+      foo = 1
+      bar = 2
+    self.check(t, t.foo, 'foo')
+    self.check(t, t.bar, 'bar')
+
+  def test_custom(self):
+    class Custom:
+      @staticmethod
+      def __stringly_loads__(value):
+        if value.startswith('int{') and value.endswith('}'):
+          return int(value[4:-1])
+        elif value.startswith('str{') and value.endswith('}'):
+          return str(value[4:-1])
+        else:
+          raise ValueError('unsupported type')
+      @staticmethod
+      def __stringly_dumps__(value):
+        if isinstance(value, int):
+          return 'int{{{}}}'.format(value)
+        elif isinstance(value, str):
+          return 'str{{{}}}'.format(value)
+        else:
+          raise ValueError('unsupported type')
+    self.check(Custom, '1', 'str{1}')
+    self.check(Custom, 1, 'int{1}')
+
+class DocString(unittest.TestCase):
+  '''Some text.
+
+  .. arguments::
+
+     foo
+       Description of foo.
+     bar [1]
+
+  Some more text.
+
+  .. presets::
+
+     my preset
+       foo=Foo
+         x=1
+         y=2
+       bar=2
+  '''
+
+  def test_text(self):
+    self.assertEqual(stringly.util.DocString(self).text,
+      'Some text.\n\nSome more text.')
+
+  def test_defaults(self):
+    self.assertEqual(stringly.util.DocString(self).defaults,
+      {'bar': '1'})
+
+  def test_argdocs(self):
+    self.assertEqual(stringly.util.DocString(self).argdocs,
+      {'foo': 'Description of foo.', 'bar': ''})
+
+  def test_presets(self):
+    self.assertEqual(stringly.util.DocString(self).presets,
+      {'my preset': {'foo': 'Foo{x=1,y=2}', 'bar': '2'}})
