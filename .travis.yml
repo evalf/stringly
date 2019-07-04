@@ -1,0 +1,15 @@
+language: python
+dist: xenial
+python:
+  - "3.5"
+  - "3.6"
+  - "3.7"
+install:
+  - python3 -m pip install --upgrade pip
+  - python3 -m pip install --upgrade .[test] coverage
+script:
+  - python3 -m coverage run -m unittest -b
+after_success:
+  - python3 -m coverage xml -i
+  - bash <(curl -s https://codecov.io/bash) -f coverage.xml
+# vim: ts=2:sts=2:sw=2:et
