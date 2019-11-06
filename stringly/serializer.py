@@ -307,7 +307,7 @@ class Enum(typing.Generic[enumT]):
         raise error.SerializationError('object is not an instance of type {}'.format(self.cls))
       return v.name
   def __str__(self) -> str:
-    return str(getattr(self, '__name__', ''))
+    return str(getattr(self.cls, '__name__', ''))
 
 class _strarg:
   def __init__(self, value: str) -> None:
