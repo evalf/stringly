@@ -5,34 +5,6 @@ if sys.version_info >= (3,7):
 else:
   dataclasses = None
 
-class Escape(unittest.TestCase):
-
-  def assertEscaped(self, orig, normal=None):
-    if normal is not None:
-      self.assertEqual(stringly.util.escape(orig), normal)
-    else:
-      normal = stringly.util.escape(orig)
-    self.assertEqual(stringly.util.unescape(normal), orig)
-
-  def test_combinations(self):
-    for length in range(6):
-      for i in range(2**length):
-        self.assertEscaped(''.join('{}'[i>>j&1] for j in range(length)))
-
-  def test_normality(self):
-    self.assertEscaped('abc', 'abc')
-    self.assertEscaped('ab{cd}ef', 'ab{cd}ef')
-
-  def test_negativity(self):
-    self.assertEscaped('ab}cd{ef', 'ab}{cd{}ef')
-    self.assertEscaped('a}b}cd{e{f', 'a}{b}{cd{}e{}f')
-
-  def test_disbalance(self):
-    self.assertEscaped('abc}def', 'abc}{def')
-    self.assertEscaped('abc{def', 'abc{}def')
-    self.assertEscaped('a{bc}de{f', 'a{}bc}{de{}f')
-    self.assertEscaped('a}bc{de}f', 'a}{bc{de}f')
-
 class Protect(unittest.TestCase):
 
   def assertProtected(self, orig, protected=None, sep=','):
@@ -40,17 +12,39 @@ class Protect(unittest.TestCase):
       self.assertEqual(stringly.util.protect(orig, sep), protected)
     else:
       protected = stringly.util.protect(orig, sep)
-    self.assertEqual(stringly.util.safesplit(protected, sep), [protected] if orig else [])
+    if sep is not None:
+      self.assertEqual(stringly.util.safesplit(protected, sep), [protected] if orig else [])
     self.assertEqual(stringly.util.unprotect(protected), orig)
 
+  def assertNormal(self, s):
+    sep = ','
+    assert sep not in s
+    self.assertProtected(s, s, sep=sep)
+    self.assertProtected(s, '{'+s+'}', sep=None)
+
+  def assertNormalUnlessUnconditionalProtection(self, s, protected):
+    sep = ','
+    assert sep not in s
+    self.assertProtected(s, s, sep=sep)
+    self.assertProtected(s, protected, sep=None)
+
   def test_combinations(self):
+    for length in range(6):
+      for i in range(4**length):
+        self.assertProtected(''.join('{}<>'[i>>2*j&0b11] for j in range(length)))
+        self.assertProtected(''.join('{}<>'[i>>2*j&0b11] for j in range(length)), sep=None)
     for length in range(6):
       for i in range(4**length):
         self.assertProtected(''.join('{},x'[i>>(j*2)&3] for j in range(length)))
 
   def test_normality(self):
-    self.assertProtected('abc', 'abc')
-    self.assertProtected('ab{cd}ef', 'ab{cd}ef')
+    self.assertNormal('')
+    self.assertNormal('abc')
+    self.assertNormal('ab{cd}ef')
+    self.assertNormal('<abc>')
+    self.assertNormal('<abc></abc>')
+    self.assertNormal('<{}>')
+    self.assertNormal('a\nb')
 
   def test_protection(self):
     self.assertProtected('abc,def', '{abc,def}')
@@ -59,11 +53,29 @@ class Protect(unittest.TestCase):
 
   def test_braces(self):
     self.assertProtected('{abc}', '{{abc}}')
-    self.assertProtected('{abc{', '{{}abc{}}')
-    self.assertProtected('}abc}', '{}{abc}{}')
-    self.assertProtected('}abc{', '{}{abc{}}')
-    self.assertProtected('}abc', '{}{abc}')
-    self.assertProtected('abc{', '{abc{}}')
+    self.assertProtected('{abc{', '{{abc{<}}>}')
+    self.assertProtected('}abc}', '{<{{>}abc}}')
+    self.assertProtected('}abc{', '{<{>}abc{<}>}')
+    self.assertProtected('}abc', '{<{>}abc}')
+    self.assertProtected('abc{', '{abc{<}>}')
+    self.assertProtected('abc}def', '{<{>abc}def}')
+    self.assertProtected('abc{def', '{abc{def<}>}')
+    self.assertProtected('a{bc}de{f', '{a{bc}de{f<}>}')
+    self.assertProtected('a}bc{de}f', '{<{>a}bc{de}f}')
+
+  def test_header_footer(self):
+    self.assertNormalUnlessUnconditionalProtection('<>', '{<><><>}')
+    self.assertNormalUnlessUnconditionalProtection('a<>', '{a<><>}')
+    self.assertNormalUnlessUnconditionalProtection('<>a', '{<><>a}')
+    self.assertNormalUnlessUnconditionalProtection('<{><}>', '{<><{><}><>}')
+    self.assertNormalUnlessUnconditionalProtection('<{{><}}>', '{<><{{><}}><>}')
+    self.assertProtected('<{>', '{<><{><}>}')
+    self.assertProtected('<}>', '{<{><}><>}')
+    self.assertProtected('<{{>', '{<><{{><}}>}')
+    self.assertProtected('<}}>', '{<{{><}}><>}')
+    self.assertProtected('<>,', '{<><>,}')
+    self.assertProtected(',<>', '{,<><>}')
+    self.assertProtected('<>,<>', '{<><>,<><>}')
 
 class PrettifyUglify(unittest.TestCase):
 
