@@ -1,4 +1,4 @@
-import typing, re, textwrap
+import typing, re, textwrap, itertools
 from . import error
 
 def safesplit(s: str, sep: str, maxsplit: int = -1) -> typing.List[str]:
@@ -14,80 +14,40 @@ def safesplit(s: str, sep: str, maxsplit: int = -1) -> typing.List[str]:
     level += part.count('{') - part.count('}')
   return parts
 
-def isnormal(s: str) -> bool:
-  'cheap algorithm to detect strings for which escape is an identity'
-  depth = 0
-  for part in s.split('{'):
-    if depth == 1 and part.startswith('}'): # empty scope at level 0 requires escaping
-      return False
-    depth -= part.count('}')
-    if depth < 0: # negative scope requires escaping
-      return False
-    depth += 1
-  return depth == 1
-
-def escape(s: str) -> str:
-  'convert to a string with balanced braces and all non-brace characters in non-negative scope'
-  if isnormal(s):
-    return s
-  disbalance = s.count('{') - s.count('}')
-  depth = 0
-  escaped = ''
-  for c in s:
-    if disbalance and depth == 0 and c == '{}'[disbalance<0]:
-      c += '{}'[disbalance>0] # escape brace
-      disbalance += 1 if disbalance<0 else -1 # reduce disbalance
-    elif c == '{':
-      depth += 1
-      if depth <= 0:
-        c = '{}' # escape opening brace
-    elif c == '}':
-      depth -= 1
-      if depth < 0:
-        c = '}{' # escape closing brace
-      elif depth == 0 and escaped[-1] == '{': # empty scope at level 0
-        c = '}}{' # escape existing opening brace and new closing brace
-    escaped += c
-  assert depth == disbalance == 0
-  return escaped
-
-def unescape(escaped: str) -> str:
-  'inverse operation to escape'
-  if isnormal(escaped):
-    return escaped
-  depth = 0
-  s = ''
-  for c in escaped:
-    if c == '{':
-      depth += 1
-      if depth == 0 and s[-1] == '}':
-        continue
-    elif c == '}':
-      depth -= 1
-      if depth == 0 and s[-1] == '{':
-        continue
-    elif depth < 0:
-      raise error.SerializationError('source string is not positive')
-    s += c
-  if depth != 0:
-    raise error.SerializationError('source string is not balanced')
-  return s
+_bracepattern = re.compile(r'([\{\}])')
+_prefixpattern = re.compile(r'^<\{*>')
+_suffixpattern = re.compile(r'<\}*>$')
 
 def protect(s: str, c: typing.Optional[str] = None) -> str:
-  s = str(s)
-  if c is None or not isnormal(s):
-    return '{' + escape(s) + '}' # always embrace escaped strings to make them normal
-  if s.startswith('{') and s.endswith('}'):
-    return '{' + s + '}'
-  n = 0
-  for part in re.split(c, s)[:-1]:
-    n += part.count('{') - part.count('}')
-    if not n:
-      return '{' + s + '}'
-  return s
+  needsprotection = c is None or s.startswith('{') and s.endswith('}')
+  # Determine the number of braces that need to be added to the left (`l`) and
+  # right (`r`) to make `s` nonnegative and balanced. Furthermore, detect if
+  # `c`, if supplied, occurs at brace level (`n`) zero, in which case we need
+  # protection.
+  l = n = 0
+  for part in _bracepattern.split(s):
+    if part == '{':
+      n += 1
+    elif part == '}':
+      n -= 1
+      l = max(l, -n)
+    elif not needsprotection and n == 0 and re.search(typing.cast(str, c), part):
+      needsprotection = True
+  r = n + l
+  if needsprotection or l or r:
+    # Prefix `s` with '<{{...{>' only if necessary to balance or to make
+    # nonnegative (nonzero `l`) or if `s` starts with something that can be
+    # parsed as a prefix (`_prefixpattern.search(s)`). Suffix following similar
+    # rules.  Finally enclose in braces.
+    return ('{<'+'{'*l+'>' if l or _prefixpattern.search(s) else '{') + s + ('<'+'}'*r+'>}' if r or _suffixpattern.search(s) else '}')
+  else:
+    return s
+
+_protectedpattern = re.compile(r'\{(?:<\{*>)?(.*?)(?:<\}*>)?\}', flags=re.DOTALL)
 
 def unprotect(s: str) -> str:
-  return unescape(s[1:-1] if s.startswith('{') and s.endswith('}') else s)
+  m = _protectedpattern.fullmatch(s)
+  return m.group(1) if m else s
 
 def splitarg(s: str) -> typing.Tuple[str,str]:
   head, sep, tail = s.partition('{')
@@ -98,11 +58,15 @@ def splitarg(s: str) -> typing.Tuple[str,str]:
 def prettify(s: str) -> str:
   return _prettify(s, '')
 
+def _isnonnegativebalanced(s: str) -> bool:
+  depths = tuple(itertools.accumulate(1 if b == '{' else -1 for b in _bracepattern.findall(s)))
+  return not depths or all(depth >= 0 for depth in depths) and depths[-1] == 0
+
 def _prettify(s: str, indent: str) -> str:
   pretty = ''
   for part in safesplit(s, ','):
     i = part.find('{')
-    if i > 0 and part.endswith('}') and isnormal(part[i+1:-1]):
+    if i > 0 and part.endswith('}') and _isnonnegativebalanced(part[i+1:-1]):
       scope = _prettify(part[i+1:-1], indent+'  ')
       part = part[:i]
     else:
