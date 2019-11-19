@@ -275,7 +275,8 @@ class Optional(typing.Generic[T]):
     with dumping(self, v):
       if v is None:
         return ''
-      return self.serializer.dumps(v) or '{}'
+      s = self.serializer.dumps(v)
+      return util.protect(s) if s.startswith('{') and s.endswith('}') or not s else s
   def __str__(self) -> str:
     return 'typing.Optional[{}]'.format(self.serializer)
 

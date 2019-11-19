@@ -265,6 +265,9 @@ class Typing(unittest.TestCase):
   def test_optional(self):
     self.check(typing.Optional[str], '1', '1')
     self.check(typing.Optional[str], '', '{}')
+    self.check(typing.Optional[str], '{}', '{{}}')
+    self.check(typing.Optional[str], '{', '{')
+    self.check(typing.Optional[str], '}', '}')
     self.check(typing.Optional[int], 1, '1')
 
   def test_optional_union(self):
