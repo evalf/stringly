@@ -158,11 +158,11 @@ class Int(unittest.TestCase):
     self.assertEqual(stringly.dumps(int, 1), '1')
 
   def test_dumps_float(self):
-    with self.assertRaisesRegex(stringly.error.SerializationError, '1.0 .* is not an instance of int'):
+    with self.assertRaisesRegex(stringly.error.SerializationError, 'dumping 1.0 <float> as int'):
       stringly.dumps(int, 1.0)
 
   def test_dumps_complex(self):
-    with self.assertRaisesRegex(stringly.error.SerializationError, '1j .* is not an instance of int'):
+    with self.assertRaisesRegex(stringly.error.SerializationError, 'dumping 1j <complex> as int'):
       stringly.dumps(int, 1j)
 
 class Float(unittest.TestCase):
@@ -184,7 +184,7 @@ class Float(unittest.TestCase):
     self.assertEqual(stringly.dumps(float, 0.2), '0.2')
 
   def test_dumps_complex(self):
-    with self.assertRaisesRegex(stringly.error.SerializationError, '1j .* is not an instance of float'):
+    with self.assertRaisesRegex(stringly.error.SerializationError, 'dumping 1j <complex> as float'):
       stringly.dumps(float, 1j)
 
 class Complex(unittest.TestCase):
