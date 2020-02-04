@@ -95,14 +95,14 @@ def loading(t: typing.Any, s: str, capture: typing.Type[Exception] = error.Seria
   try:
     yield
   except capture as e:
-    raise error.SerializationError('loading {!r} as {}: {}'.format(s, t, e)) from None
+    raise error.SerializationError('loading {!r} as {}'.format(s, t)) from e
 
 @contextlib.contextmanager
 def dumping(t: typing.Any, v: typing.Any, capture: typing.Type[Exception] = error.SerializationError) -> typing.Generator[None, None, None]:
   try:
     yield
   except capture as e:
-    raise error.SerializationError('dumping {!r} <{}> as {}: {}'.format(v, type(v).__name__, t, e)) from None
+    raise error.SerializationError('dumping {!r} <{}> as {}'.format(v, type(v).__name__, t)) from e
 
 class Custom(typing.Generic[T]):
   def __init__(self, C: proto.Custom[T]) -> None:
