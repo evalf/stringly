@@ -142,6 +142,11 @@ class Bool(unittest.TestCase):
     self.assertEqual(stringly.dumps(bool, True), 'True')
     self.assertEqual(stringly.dumps(bool, False), 'False')
 
+  def test_serializer(self):
+    s = stringly.serializer.get(bool)
+    self.assertIsInstance(s, stringly.serializer.Boolean)
+    self.assertEqual(str(s), 'bool')
+
 class Int(unittest.TestCase):
 
   def test_loads(self):
@@ -165,6 +170,11 @@ class Int(unittest.TestCase):
     with self.assertRaisesRegex(stringly.error.SerializationError, '1j .* is not an instance of int'):
       stringly.dumps(int, 1j)
 
+  def test_serializer(self):
+    s = stringly.serializer.get(int)
+    self.assertIsInstance(s, stringly.serializer.Int)
+    self.assertEqual(str(s), 'int')
+
 class Float(unittest.TestCase):
 
   def test_loads(self):
@@ -187,6 +197,11 @@ class Float(unittest.TestCase):
     with self.assertRaisesRegex(stringly.error.SerializationError, '1j .* is not an instance of float'):
       stringly.dumps(float, 1j)
 
+  def test_serializer(self):
+    s = stringly.serializer.get(float)
+    self.assertIsInstance(s, stringly.serializer.Float)
+    self.assertEqual(str(s), 'float')
+
 class Complex(unittest.TestCase):
 
   def test_loads(self):
@@ -208,14 +223,34 @@ class Complex(unittest.TestCase):
     self.assertEqual(stringly.dumps(complex, 1+0j), '1')
     self.assertEqual(stringly.dumps(complex, 1+2j), '1+2j')
 
+  def test_serializer(self):
+    s = stringly.serializer.get(complex)
+    self.assertIsInstance(s, stringly.serializer.Complex)
+    self.assertEqual(str(s), 'complex')
+
+class Decimal(unittest.TestCase):
+
+  def test_loads(self):
+    self.assertEqual(stringly.loads(decimal.Decimal, '1.2'), decimal.Decimal('1.2'))
+    with self.assertRaises(stringly.error.SerializationError):
+      stringly.loads(float, '1a')
+
+  def test_dumps(self):
+    self.assertEqual(stringly.dumps(decimal.Decimal, decimal.Decimal('1.2')), '1.2')
+    with self.assertRaisesRegex(stringly.error.SerializationError, '1.2 .* is not an instance of Decimal'):
+      stringly.dumps(decimal.Decimal, 1.2)
+
+  def test_serializer(self):
+    s = stringly.serializer.get(decimal.Decimal)
+    self.assertIsInstance(s, stringly.serializer.Decimal)
+    self.assertEqual(str(s), 'decimal.Decimal')
+
 class Typing(unittest.TestCase):
 
-  def check(self, t, v, s):
+  def check(self, t, v, s, strt=None):
     self.assertEqual(stringly.dumps(t, v), s)
     self.assertEqual(stringly.loads(t, s), v)
-
-  def test_decimal(self):
-    self.check(decimal.Decimal, decimal.Decimal('1.2'), '1.2')
+    self.assertEqual(str(stringly.serializer.get(t)), strt or str(t))
 
   def test_tuple(self):
     self.check(typing.Tuple[str], ('',), '{}')
@@ -263,28 +298,28 @@ class Typing(unittest.TestCase):
     self.check(typing.Union[str,complex], '', 'str')
 
   def test_optional(self):
-    self.check(typing.Optional[str], '1', '1')
-    self.check(typing.Optional[str], '', '{}')
-    self.check(typing.Optional[str], '{}', '{{}}')
-    self.check(typing.Optional[str], '{', '{')
-    self.check(typing.Optional[str], '}', '}')
-    self.check(typing.Optional[int], 1, '1')
+    self.check(typing.Optional[str], '1', '1', 'typing.Optional[str]')
+    self.check(typing.Optional[str], '', '{}', 'typing.Optional[str]')
+    self.check(typing.Optional[str], '{}', '{{}}', 'typing.Optional[str]')
+    self.check(typing.Optional[str], '{', '{', 'typing.Optional[str]')
+    self.check(typing.Optional[str], '}', '}', 'typing.Optional[str]')
+    self.check(typing.Optional[int], 1, '1', 'typing.Optional[int]')
 
   def test_optional_union(self):
-    self.check(typing.Optional[typing.Union[str,int]], '1', 'str{1}')
-    self.check(typing.Optional[typing.Union[str,int]], 1, 'int{1}')
-    self.check(typing.Optional[typing.Union[str,int]], None, '')
-    self.check(typing.Optional[typing.Union[str,int]], '', 'str')
+    self.check(typing.Optional[typing.Union[str,int]], '1', 'str{1}', 'typing.Optional[typing.Union[str, int]]')
+    self.check(typing.Optional[typing.Union[str,int]], 1, 'int{1}', 'typing.Optional[typing.Union[str, int]]')
+    self.check(typing.Optional[typing.Union[str,int]], None, '', 'typing.Optional[typing.Union[str, int]]')
+    self.check(typing.Optional[typing.Union[str,int]], '', 'str', 'typing.Optional[typing.Union[str, int]]')
 
   def test_optional_empty_value(self):
-    self.check(typing.Optional[str], None, '')
-    self.check(typing.Optional[int], None, '')
+    self.check(typing.Optional[str], None, '', 'typing.Optional[str]')
+    self.check(typing.Optional[int], None, '', 'typing.Optional[int]')
 
   def test_dataclass(self):
     if not dataclasses:
       self.skipTest('module dataclasses unavailable for python < 3.7')
     t = dataclasses.make_dataclass('t', [('a', int), ('b', str, dataclasses.field(default='2'))])
-    self.check(t, t(a=1, b='2,3'), 'a=1,b={2,3}')
+    self.check(t, t(a=1, b='2,3'), 'a=1,b={2,3}', 't')
     self.assertEqual(stringly.loads(t, 'a=1'), t(a=1))
 
   def test_namedtuple(self):
@@ -297,7 +332,7 @@ class Typing(unittest.TestCase):
         b: str = '2'
       '''), globals(), l)
     t = l['t']
-    self.check(t, t(a=1, b='2,3'), 'a=1,b={2,3}')
+    self.check(t, t(a=1, b='2,3'), 'a=1,b={2,3}', 't')
     self.assertEqual(stringly.loads(t, 'a=1'), t(a=1))
 
   def test_newarg(self):
@@ -309,7 +344,7 @@ class Typing(unittest.TestCase):
         return (self.a, self.b), {}
       def __eq__(self, other):
         return type(self) == type(other) and self.a == other.a and self.b == other.b
-    self.check(t, t(), 'a=1,b=2j')
+    self.check(t, t(), 'a=1,b=2j', 't')
 
   def test_positional(self):
     import inspect
@@ -325,14 +360,14 @@ class Typing(unittest.TestCase):
         return self.a, self.b
       def __eq__(self, other):
         return isinstance(other, t) and self.a == other.a and self.b == other.b
-    self.check(t, t(1,2.), '1,b=2')
+    self.check(t, t(1,2.), '1,b=2', 't')
 
   def test_enum(self):
     class t(enum.Enum):
       foo = 1
       bar = 2
-    self.check(t, t.foo, 'foo')
-    self.check(t, t.bar, 'bar')
+    self.check(t, t.foo, 'foo', 't')
+    self.check(t, t.bar, 'bar', 't')
 
   def test_custom(self):
     class Custom:
@@ -352,8 +387,8 @@ class Typing(unittest.TestCase):
           return 'str{{{}}}'.format(value)
         else:
           raise ValueError('unsupported type')
-    self.check(Custom, '1', 'str{1}')
-    self.check(Custom, 1, 'int{1}')
+    self.check(Custom, '1', 'str{1}', 'Custom')
+    self.check(Custom, 1, 'int{1}', 'Custom')
 
 class DocString(unittest.TestCase):
   '''Some text.
