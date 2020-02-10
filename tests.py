@@ -237,7 +237,7 @@ class Decimal(unittest.TestCase):
 
   def test_dumps(self):
     self.assertEqual(stringly.dumps(decimal.Decimal, decimal.Decimal('1.2')), '1.2')
-    with self.assertRaisesRegex(stringly.error.SerializationError, '1.2 .* is not an instance of Decimal'):
+    with self.assertRaisesRegex(stringly.error.SerializationError, 'dumping 1.2 <float> as decimal.Decimal'):
       stringly.dumps(decimal.Decimal, 1.2)
 
   def test_serializer(self):
