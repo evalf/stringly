@@ -201,7 +201,7 @@ class UniformTuple(typing.Generic[T]):
       return tuple(self.itemserializer.loads(util.unprotect(si)) for si in parts)
   def dumps(self, v: typing.Tuple[T, ...]) -> str:
     with dumping(self, v):
-      return ','.join(util.protect(self.itemserializer.dumps(vi), ',') or '{}' for vi in v)
+      return ','.join(util.protect_regex(self.itemserializer.dumps(vi), ',') or '{}' for vi in v)
   def __str__(self) -> str:
     return 'typing.Tuple[{}, ...]'.format(self.itemserializer)
 
@@ -217,7 +217,7 @@ class PluriformTuple:
   def dumps(self, v: typing.Tuple[typing.Any, ...]) -> str:
     with dumping(self, v):
       if len(self.itemserializers) == len(v):
-        return ','.join(util.protect(zi.dumps(vi), ',') or '{}' for zi, vi in zip(self.itemserializers, v))
+        return ','.join(util.protect_regex(zi.dumps(vi), ',') or '{}' for zi, vi in zip(self.itemserializers, v))
       raise error.SerializationError('tuple has incorrect length')
   def __str__(self) -> str:
     return 'typing.Tuple[{}]'.format(', '.join(map(str, self.itemserializers)))
@@ -238,7 +238,7 @@ class Dict(typing.Generic[K, V]):
       return v
   def dumps(self, v: typing.Dict[K, V]) -> str:
     with dumping(self, v):
-      return ','.join(util.protect(self.keyserializer.dumps(vk), ',|=') + '=' + util.protect(self.valueserializer.dumps(vv), ',') for vk, vv in v.items())
+      return ','.join(util.protect_regex(self.keyserializer.dumps(vk), ',|=') + '=' + util.protect_regex(self.valueserializer.dumps(vv), ',') for vk, vv in v.items())
   def __str__(self) -> str:
     return 'typing.Dict[{}, {}]'.format(self.keyserializer, self.valueserializer)
 
@@ -258,7 +258,7 @@ class Union:
           s = serializer.dumps(v)
         except error.SerializationError:
           continue
-        return name + util.protect(s) if s else name
+        return name + util.protect_unconditionally(s) if s else name
       raise error.SerializationError('failed to find matching serializer')
   def __str__(self) -> str:
     return 'typing.Union[{}]'.format(', '.join(map(str, self.serializers.values())))
@@ -276,7 +276,7 @@ class Optional(typing.Generic[T]):
       if v is None:
         return ''
       s = self.serializer.dumps(v)
-      return util.protect(s) if s.startswith('{') and s.endswith('}') or not s else s
+      return util.protect_unconditionally(s) if s.startswith('{') and s.endswith('}') or not s else s
   def __str__(self) -> str:
     return 'typing.Optional[{}]'.format(self.serializer)
 
@@ -289,7 +289,7 @@ class Sequence:
       return self.origin(self.itemserializer.loads(util.unprotect(si)) for si in util.safesplit(s, ','))
   def dumps(self, v: typing.Any) -> str:
     with dumping(self, v):
-      return ','.join(util.protect(self.itemserializer.dumps(vi), ',') or '{}' for vi in v)
+      return ','.join(util.protect_regex(self.itemserializer.dumps(vi), ',') or '{}' for vi in v)
   def __str__(self) -> str:
     typename = {list: 'typing.List', set: 'typing.Set', frozenset: 'typing.FrozenSet'}[self.origin]
     return '{}[{}]'.format(typename, self.itemserializer)
@@ -376,7 +376,7 @@ class Generic(typing.Generic[T]):
         args = tuple(getattr(v, name) for name in self.argnames)
       else:
         raise error.SerializationError('cannot dump {}'.format(v))
-      return ','.join([util.protect(self.serializers[i].dumps(args[i]), ',') for i in range(self.npositional)]
-                    + [util.protect(self.argnames[i], ',|=') + '=' + util.protect(self.serializers[i].dumps(args[i]), ',') for i in range(self.npositional, len(self.argnames))])
+      return ','.join([util.protect_regex(self.serializers[i].dumps(args[i]), ',') for i in range(self.npositional)]
+                    + [util.protect_regex(self.argnames[i], ',|=') + '=' + util.protect_regex(self.serializers[i].dumps(args[i]), ',') for i in range(self.npositional, len(self.argnames))])
   def __str__(self) -> str:
     return str(getattr(self.cls, '__name__', repr(self.cls)))

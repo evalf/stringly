@@ -7,13 +7,14 @@ else:
 
 class Protect(unittest.TestCase):
 
-  def assertProtected(self, orig, protected=None, sep=','):
-    if protected is not None:
-      self.assertEqual(stringly.util.protect(orig, sep), protected)
+  def assertProtected(self, orig, checkprotected=None, sep=','):
+    if sep is None:
+      protected = stringly.util.protect_unconditionally(orig)
     else:
-      protected = stringly.util.protect(orig, sep)
-    if sep is not None:
+      protected = stringly.util.protect_regex(orig, sep)
       self.assertEqual(stringly.util.safesplit(protected, sep), [protected] if orig else [])
+    if checkprotected is not None:
+      self.assertEqual(protected, checkprotected)
     self.assertEqual(stringly.util.unprotect(protected), orig)
 
   def assertNormal(self, s):
