@@ -376,7 +376,7 @@ class Generic(typing.Generic[T]):
         args = tuple(getattr(v, name) for name in self.argnames)
       else:
         raise error.SerializationError('cannot dump {}'.format(v))
-      return ','.join([util.protect(self.serializers[i].dumps(args[i]), '=') for i in range(self.npositional)]
+      return ','.join([util.protect(self.serializers[i].dumps(args[i]), ',') for i in range(self.npositional)]
                     + [util.protect(self.argnames[i], ',|=') + '=' + util.protect(self.serializers[i].dumps(args[i]), ',') for i in range(self.npositional, len(self.argnames))])
   def __str__(self) -> str:
     return str(getattr(self.cls, '__name__', repr(self.cls)))

@@ -349,18 +349,18 @@ class Typing(unittest.TestCase):
   def test_positional(self):
     import inspect
     class t:
-      def __init__(self, a: int, b: float):
+      def __init__(self, a: str, b: float):
         self.a = a
         self.b = b
       __init__.__signature__ = inspect.Signature([
         inspect.Parameter('self', inspect.Parameter.POSITIONAL_ONLY),
-        inspect.Parameter('a', inspect.Parameter.POSITIONAL_ONLY, annotation=int),
+        inspect.Parameter('a', inspect.Parameter.POSITIONAL_ONLY, annotation=str),
         inspect.Parameter('b', inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=float)])
       def __getnewargs__(self):
         return self.a, self.b
       def __eq__(self, other):
         return isinstance(other, t) and self.a == other.a and self.b == other.b
-    self.check(t, t(1,2.), '1,b=2', 't')
+    self.check(t, t('x,y',2.), '{x,y},b=2', 't')
 
   def test_enum(self):
     class t(enum.Enum):
