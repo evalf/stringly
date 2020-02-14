@@ -363,6 +363,31 @@ class Typing(unittest.TestCase):
         return isinstance(other, t) and self.a == other.a and self.b == other.b
     self.check(t, t('x,y',2.), '{x,y},b=2', 't')
 
+  def test_single_positional(self):
+    import inspect
+    class t:
+      def __init__(self, arg: str):
+        self.arg = arg
+      __init__.__signature__ = inspect.Signature([
+        inspect.Parameter('self', inspect.Parameter.POSITIONAL_ONLY),
+        inspect.Parameter('arg', inspect.Parameter.POSITIONAL_ONLY, annotation=str)])
+      def __getnewargs__(self):
+        return self.arg,
+      def __eq__(self, other):
+        return isinstance(other, t) and self.arg == other.arg
+    self.check(t, t('x,y'), 'x,y', 't')
+
+  def test_single_keyword(self):
+    import inspect
+    class t:
+      def __init__(self, arg: str):
+        self.arg = arg
+      def __getnewargs__(self):
+        return self.arg,
+      def __eq__(self, other):
+        return isinstance(other, t) and self.arg == other.arg
+    self.check(t, t('x,y'), 'arg=x,y', 't')
+
   def test_enum(self):
     class t(enum.Enum):
       foo = 1

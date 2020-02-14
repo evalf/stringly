@@ -340,21 +340,29 @@ class Generic(typing.Generic[T]):
   def loads(self, s: str) -> T:
     with loading(self.cls, s):
       args = self.defaults.copy()
-      index = 0
-      for si in util.safesplit(s, ','):
-        parts = util.safesplit(si, '=', 1)
-        if len(parts) == 2:
-          name, value = map(util.unprotect, parts)
-          try:
-            index = self.argnames.index(name, self.npositional)
-          except ValueError:
-            raise error.SerializationError('invalid argument {!r}'.format(name)) from None
-          args[index] = _strarg(value)
-        elif index < self.npositional:
-          args[index] = _strarg(util.unprotect(si))
-          index += 1
-        else:
-          raise error.SerializationError('invalid expression')
+      if len(self.argnames) == 1:
+        if not self.npositional:
+          parts = util.safesplit(s, '=', 1)
+          if len(parts) != 2 or parts[0] != self.argnames[0]:
+            raise error.SerializationError('invalid argument {!r}'.format(parts[0])) from None
+          s = parts[1]
+        args[0] = _strarg(util.unprotect(s))
+      else:
+        index = 0
+        for si in util.safesplit(s, ','):
+          parts = util.safesplit(si, '=', 1)
+          if len(parts) == 2:
+            name, value = map(util.unprotect, parts)
+            try:
+              index = self.argnames.index(name, self.npositional)
+            except ValueError:
+              raise error.SerializationError('invalid argument {!r}'.format(name)) from None
+            args[index] = _strarg(value)
+          elif index < self.npositional:
+            args[index] = _strarg(util.unprotect(si))
+            index += 1
+          else:
+            raise error.SerializationError('invalid expression')
       for i, arg in enumerate(args):
         if arg is inspect.Parameter.empty:
           raise error.SerializationError('missing mantatory argument {!r}'.format(self.argnames[i]))
@@ -376,7 +384,12 @@ class Generic(typing.Generic[T]):
         args = tuple(getattr(v, name) for name in self.argnames)
       else:
         raise error.SerializationError('cannot dump {}'.format(v))
-      return ','.join([util.protect_regex(self.serializers[i].dumps(args[i]), ',') for i in range(self.npositional)]
-                    + [util.protect_regex(self.argnames[i], ',|=') + '=' + util.protect_regex(self.serializers[i].dumps(args[i]), ',') for i in range(self.npositional, len(self.argnames))])
+      dumps = [serializer.dumps(arg) for serializer, arg in zip(self.serializers, args)]
+      if len(self.argnames) == 1:
+        return util.protect_unbalanced(dumps[0]) if self.npositional \
+          else util.protect_regex(self.argnames[0], '=') + '=' + util.protect_unbalanced(dumps[0])
+      else:
+        return ','.join(util.protect_regex(dumps[i], ',') if i < self.npositional
+          else util.protect_regex(self.argnames[i], ',|=') + '=' + util.protect_regex(dumps[i], ',') for i in range(len(self.argnames)))
   def __str__(self) -> str:
     return str(getattr(self.cls, '__name__', repr(self.cls)))
