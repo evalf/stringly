@@ -7,13 +7,14 @@ else:
 
 class Protect(unittest.TestCase):
 
-  def assertProtected(self, orig, protected=None, sep=','):
-    if protected is not None:
-      self.assertEqual(stringly.util.protect(orig, sep), protected)
+  def assertProtected(self, orig, checkprotected=None, sep=','):
+    if sep is None:
+      protected = stringly.util.protect_unconditionally(orig)
     else:
-      protected = stringly.util.protect(orig, sep)
-    if sep is not None:
+      protected = stringly.util.protect_regex(orig, sep)
       self.assertEqual(stringly.util.safesplit(protected, sep), [protected] if orig else [])
+    if checkprotected is not None:
+      self.assertEqual(protected, checkprotected)
     self.assertEqual(stringly.util.unprotect(protected), orig)
 
   def assertNormal(self, s):
@@ -349,18 +350,43 @@ class Typing(unittest.TestCase):
   def test_positional(self):
     import inspect
     class t:
-      def __init__(self, a: int, b: float):
+      def __init__(self, a: str, b: float):
         self.a = a
         self.b = b
       __init__.__signature__ = inspect.Signature([
         inspect.Parameter('self', inspect.Parameter.POSITIONAL_ONLY),
-        inspect.Parameter('a', inspect.Parameter.POSITIONAL_ONLY, annotation=int),
+        inspect.Parameter('a', inspect.Parameter.POSITIONAL_ONLY, annotation=str),
         inspect.Parameter('b', inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=float)])
       def __getnewargs__(self):
         return self.a, self.b
       def __eq__(self, other):
         return isinstance(other, t) and self.a == other.a and self.b == other.b
-    self.check(t, t(1,2.), '1,b=2', 't')
+    self.check(t, t('x,y',2.), '{x,y},b=2', 't')
+
+  def test_single_positional(self):
+    import inspect
+    class t:
+      def __init__(self, arg: str):
+        self.arg = arg
+      __init__.__signature__ = inspect.Signature([
+        inspect.Parameter('self', inspect.Parameter.POSITIONAL_ONLY),
+        inspect.Parameter('arg', inspect.Parameter.POSITIONAL_ONLY, annotation=str)])
+      def __getnewargs__(self):
+        return self.arg,
+      def __eq__(self, other):
+        return isinstance(other, t) and self.arg == other.arg
+    self.check(t, t('x,y'), 'x,y', 't')
+
+  def test_single_keyword(self):
+    import inspect
+    class t:
+      def __init__(self, arg: str):
+        self.arg = arg
+      def __getnewargs__(self):
+        return self.arg,
+      def __eq__(self, other):
+        return isinstance(other, t) and self.arg == other.arg
+    self.check(t, t('x,y'), 'arg=x,y', 't')
 
   def test_enum(self):
     class t(enum.Enum):

@@ -18,12 +18,21 @@ _bracepattern = re.compile(r'([\{\}])')
 _prefixpattern = re.compile(r'^<\{*>')
 _suffixpattern = re.compile(r'<\}*>$')
 
-def protect(s: str, c: typing.Optional[str] = None) -> str:
-  needsprotection = c is None or s.startswith('{') and s.endswith('}')
+def protect_unconditionally(s: str) -> str:
+  return _protect(s, lambda part: True)
+
+def protect_unbalanced(s: str) -> str:
+  return _protect(s, lambda part: False)
+
+def protect_regex(s: str, regex: str) -> str:
+  pattern = re.compile(regex)
+  return _protect(s, lambda part: pattern.search(part) is not None)
+
+def _protect(s: str, test: typing.Callable[[str], bool]) -> str:
+  needsprotection = s.startswith('{') and s.endswith('}')
   # Determine the number of braces that need to be added to the left (`l`) and
   # right (`r`) to make `s` nonnegative and balanced. Furthermore, detect if
-  # `c`, if supplied, occurs at brace level (`n`) zero, in which case we need
-  # protection.
+  # `test` is true at brace level (`n`) zero, in which case we need protection.
   l = n = 0
   for part in _bracepattern.split(s):
     if part == '{':
@@ -31,8 +40,8 @@ def protect(s: str, c: typing.Optional[str] = None) -> str:
     elif part == '}':
       n -= 1
       l = max(l, -n)
-    elif not needsprotection and n == 0 and re.search(typing.cast(str, c), part):
-      needsprotection = True
+    elif not needsprotection:
+      needsprotection = n == 0 and test(part)
   r = n + l
   if needsprotection or l or r:
     # Prefix `s` with '<{{...{>' only if necessary to balance or to make

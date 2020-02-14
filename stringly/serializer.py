@@ -201,7 +201,7 @@ class UniformTuple(typing.Generic[T]):
       return tuple(self.itemserializer.loads(util.unprotect(si)) for si in parts)
   def dumps(self, v: typing.Tuple[T, ...]) -> str:
     with dumping(self, v):
-      return ','.join(util.protect(self.itemserializer.dumps(vi), ',') or '{}' for vi in v)
+      return ','.join(util.protect_regex(self.itemserializer.dumps(vi), ',') or '{}' for vi in v)
   def __str__(self) -> str:
     return 'typing.Tuple[{}, ...]'.format(self.itemserializer)
 
@@ -217,7 +217,7 @@ class PluriformTuple:
   def dumps(self, v: typing.Tuple[typing.Any, ...]) -> str:
     with dumping(self, v):
       if len(self.itemserializers) == len(v):
-        return ','.join(util.protect(zi.dumps(vi), ',') or '{}' for zi, vi in zip(self.itemserializers, v))
+        return ','.join(util.protect_regex(zi.dumps(vi), ',') or '{}' for zi, vi in zip(self.itemserializers, v))
       raise error.SerializationError('tuple has incorrect length')
   def __str__(self) -> str:
     return 'typing.Tuple[{}]'.format(', '.join(map(str, self.itemserializers)))
@@ -238,7 +238,7 @@ class Dict(typing.Generic[K, V]):
       return v
   def dumps(self, v: typing.Dict[K, V]) -> str:
     with dumping(self, v):
-      return ','.join(util.protect(self.keyserializer.dumps(vk), ',|=') + '=' + util.protect(self.valueserializer.dumps(vv), ',') for vk, vv in v.items())
+      return ','.join(util.protect_regex(self.keyserializer.dumps(vk), ',|=') + '=' + util.protect_regex(self.valueserializer.dumps(vv), ',') for vk, vv in v.items())
   def __str__(self) -> str:
     return 'typing.Dict[{}, {}]'.format(self.keyserializer, self.valueserializer)
 
@@ -258,7 +258,7 @@ class Union:
           s = serializer.dumps(v)
         except error.SerializationError:
           continue
-        return name + util.protect(s) if s else name
+        return name + util.protect_unconditionally(s) if s else name
       raise error.SerializationError('failed to find matching serializer')
   def __str__(self) -> str:
     return 'typing.Union[{}]'.format(', '.join(map(str, self.serializers.values())))
@@ -276,7 +276,7 @@ class Optional(typing.Generic[T]):
       if v is None:
         return ''
       s = self.serializer.dumps(v)
-      return util.protect(s) if s.startswith('{') and s.endswith('}') or not s else s
+      return util.protect_unconditionally(s) if s.startswith('{') and s.endswith('}') or not s else s
   def __str__(self) -> str:
     return 'typing.Optional[{}]'.format(self.serializer)
 
@@ -289,7 +289,7 @@ class Sequence:
       return self.origin(self.itemserializer.loads(util.unprotect(si)) for si in util.safesplit(s, ','))
   def dumps(self, v: typing.Any) -> str:
     with dumping(self, v):
-      return ','.join(util.protect(self.itemserializer.dumps(vi), ',') or '{}' for vi in v)
+      return ','.join(util.protect_regex(self.itemserializer.dumps(vi), ',') or '{}' for vi in v)
   def __str__(self) -> str:
     typename = {list: 'typing.List', set: 'typing.Set', frozenset: 'typing.FrozenSet'}[self.origin]
     return '{}[{}]'.format(typename, self.itemserializer)
@@ -340,21 +340,29 @@ class Generic(typing.Generic[T]):
   def loads(self, s: str) -> T:
     with loading(self.cls, s):
       args = self.defaults.copy()
-      index = 0
-      for si in util.safesplit(s, ','):
-        parts = util.safesplit(si, '=', 1)
-        if len(parts) == 2:
-          name, value = map(util.unprotect, parts)
-          try:
-            index = self.argnames.index(name, self.npositional)
-          except ValueError:
-            raise error.SerializationError('invalid argument {!r}'.format(name)) from None
-          args[index] = _strarg(value)
-        elif index < self.npositional:
-          args[index] = _strarg(util.unprotect(si))
-          index += 1
-        else:
-          raise error.SerializationError('invalid expression')
+      if len(self.argnames) == 1:
+        if not self.npositional:
+          parts = util.safesplit(s, '=', 1)
+          if len(parts) != 2 or parts[0] != self.argnames[0]:
+            raise error.SerializationError('invalid argument {!r}'.format(parts[0])) from None
+          s = parts[1]
+        args[0] = _strarg(util.unprotect(s))
+      else:
+        index = 0
+        for si in util.safesplit(s, ','):
+          parts = util.safesplit(si, '=', 1)
+          if len(parts) == 2:
+            name, value = map(util.unprotect, parts)
+            try:
+              index = self.argnames.index(name, self.npositional)
+            except ValueError:
+              raise error.SerializationError('invalid argument {!r}'.format(name)) from None
+            args[index] = _strarg(value)
+          elif index < self.npositional:
+            args[index] = _strarg(util.unprotect(si))
+            index += 1
+          else:
+            raise error.SerializationError('invalid expression')
       for i, arg in enumerate(args):
         if arg is inspect.Parameter.empty:
           raise error.SerializationError('missing mantatory argument {!r}'.format(self.argnames[i]))
@@ -376,7 +384,12 @@ class Generic(typing.Generic[T]):
         args = tuple(getattr(v, name) for name in self.argnames)
       else:
         raise error.SerializationError('cannot dump {}'.format(v))
-      return ','.join([util.protect(self.serializers[i].dumps(args[i]), '=') for i in range(self.npositional)]
-                    + [util.protect(self.argnames[i], ',|=') + '=' + util.protect(self.serializers[i].dumps(args[i]), ',') for i in range(self.npositional, len(self.argnames))])
+      dumps = [serializer.dumps(arg) for serializer, arg in zip(self.serializers, args)]
+      if len(self.argnames) == 1:
+        return util.protect_unbalanced(dumps[0]) if self.npositional \
+          else util.protect_regex(self.argnames[0], '=') + '=' + util.protect_unbalanced(dumps[0])
+      else:
+        return ','.join(util.protect_regex(dumps[i], ',') if i < self.npositional
+          else util.protect_regex(self.argnames[i], ',|=') + '=' + util.protect_regex(dumps[i], ',') for i in range(len(self.argnames)))
   def __str__(self) -> str:
     return str(getattr(self.cls, '__name__', repr(self.cls)))
