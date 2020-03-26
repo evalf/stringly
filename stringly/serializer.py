@@ -340,7 +340,9 @@ class Generic(typing.Generic[T]):
   def loads(self, s: str) -> T:
     with loading(self.cls, s):
       args = self.defaults.copy()
-      if len(self.argnames) == 1:
+      if not s:
+        pass
+      elif len(self.argnames) == 1:
         if not self.npositional:
           parts = util.safesplit(s, '=', 1)
           if len(parts) != 2 or parts[0] != self.argnames[0]:
@@ -386,7 +388,7 @@ class Generic(typing.Generic[T]):
         raise error.SerializationError('cannot dump {}'.format(v))
       dumps = [serializer.dumps(arg) for serializer, arg in zip(self.serializers, args)]
       if len(self.argnames) == 1:
-        return util.protect_unbalanced(dumps[0]) if self.npositional \
+        return util.protect_unbalanced(dumps[0]) or '{}' if self.npositional \
           else util.protect_regex(self.argnames[0], '=') + '=' + util.protect_unbalanced(dumps[0])
       else:
         return ','.join(util.protect_regex(dumps[i], ',') if i < self.npositional
