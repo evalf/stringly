@@ -377,6 +377,22 @@ class Typing(unittest.TestCase):
         return isinstance(other, t) and self.arg == other.arg
     self.check(t, t('x,y'), 'x,y', 't')
 
+  def test_single_positional_default(self):
+    import inspect
+    class t:
+      def __init__(self, arg: str = '1'):
+        self.arg = arg
+      __init__.__signature__ = inspect.Signature([
+        inspect.Parameter('self', inspect.Parameter.POSITIONAL_ONLY),
+        inspect.Parameter('arg', inspect.Parameter.POSITIONAL_ONLY, annotation=str, default='1')])
+      def __getnewargs__(self):
+        return self.arg,
+      def __eq__(self, other):
+        return isinstance(other, t) and self.arg == other.arg
+    self.assertEqual(stringly.dumps(t, t('')), '{}')
+    self.assertEqual(stringly.loads(t, ''), t())
+    self.check(t, t('x,y'), 'x,y', 't')
+
   def test_single_keyword(self):
     import inspect
     class t:
@@ -386,6 +402,18 @@ class Typing(unittest.TestCase):
         return self.arg,
       def __eq__(self, other):
         return isinstance(other, t) and self.arg == other.arg
+    self.check(t, t('x,y'), 'arg=x,y', 't')
+
+  def test_single_keyword_default(self):
+    import inspect
+    class t:
+      def __init__(self, arg: str = '1'):
+        self.arg = arg
+      def __getnewargs__(self):
+        return self.arg,
+      def __eq__(self, other):
+        return isinstance(other, t) and self.arg == other.arg
+    self.assertEqual(stringly.loads(t, ''), t())
     self.check(t, t('x,y'), 'arg=x,y', 't')
 
   def test_enum(self):
