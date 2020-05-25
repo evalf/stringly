@@ -60,6 +60,16 @@ def get(t: typing.Any) -> proto.Serializer[typing.Any]:
       return Decimal()
     if issubclass(t, enum.Enum):
       return Enum(t)
+    if t is tuple:
+      raise ValueError('cannot serialize tuple; use typing.Tuple[] instead')
+    if t is list:
+      raise ValueError('cannot serialize list; use typing.List[] instead')
+    if t is set:
+      raise ValueError('cannot serialize set; use typing.Set[] instead')
+    if t is frozenset:
+      raise ValueError('cannot serialize frozenset; use typing.FrozenSet[] instead')
+    if t is dict:
+      raise ValueError('cannot serialize dict; use typing.Dict[] instead')
   origin = typing_get_origin(t)
   if origin:
     args = typing_get_args(t)
