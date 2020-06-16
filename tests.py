@@ -257,6 +257,8 @@ class Typing(unittest.TestCase):
     self.check(typing.Tuple[str], ('',), '{}')
     self.check(typing.Tuple[str], ('1',), '1')
     self.check(typing.Tuple[int,complex], (1,2j), '1,2j')
+    with self.assertRaises(ValueError):
+      stringly.serializer.get(tuple)
 
   def test_uniform_tuple(self):
     self.check(typing.Tuple[str,...], (), '')
@@ -269,18 +271,24 @@ class Typing(unittest.TestCase):
     self.check(typing.List[str], [''], '{}')
     self.check(typing.List[int], [1], '1')
     self.check(typing.List[int], [1,2], '1,2')
+    with self.assertRaises(ValueError):
+      stringly.serializer.get(list)
 
   def test_set(self):
     self.check(typing.Set[str], set(), '')
     self.check(typing.Set[str], {''}, '{}')
     self.check(typing.Set[int], {1}, '1')
     self.check(typing.Set[int], {1,2}, '1,2')
+    with self.assertRaises(ValueError):
+      stringly.serializer.get(set)
 
   def test_frozenset(self):
     self.check(typing.FrozenSet[str], frozenset(), '')
     self.check(typing.FrozenSet[str], frozenset({''}), '{}')
     self.check(typing.FrozenSet[int], frozenset({1}), '1')
     self.check(typing.FrozenSet[int], frozenset({1,2}), '1,2')
+    with self.assertRaises(ValueError):
+      stringly.serializer.get(frozenset)
 
   def test_dict(self):
     self.check(typing.Dict[str,int], {}, '')
@@ -288,6 +296,8 @@ class Typing(unittest.TestCase):
     self.check(typing.Dict[str,str], {'a=': '=1'}, '{a=}==1')
     self.check(typing.Dict[str,str], {'a,': ',1'}, '{a,}={,1}')
     self.check(typing.Dict[int,complex], {1: 2j}, '1=2j')
+    with self.assertRaises(ValueError):
+      stringly.serializer.get(dict)
 
   def test_union(self):
     self.check(typing.Union[str,int,complex], '1', 'str{1}')
