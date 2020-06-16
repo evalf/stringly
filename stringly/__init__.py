@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-version = '1.0b1'
+version = '1.0b2'
 
 import sys, os, typing, runpy, importlib, re, textwrap, inspect
 from . import util, serializer, proto, error
