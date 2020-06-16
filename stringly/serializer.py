@@ -9,7 +9,7 @@ else:
 if sys.version_info >= (3,8):
   from typing import get_origin as typing_get_origin, get_args as typing_get_args
 else:
-  def typing_get_args(typ: typing.Any) -> typing.Tuple[typing.Type[typing.Any], ...]:
+  def typing_get_args(typ: typing.Any) -> typing.Tuple[typing.Any, ...]:
     args = getattr(typ, '__args__', ())
     if not isinstance(args, tuple):
       raise ValueError('expected __args__ to be a tuple but got {!r}'.format(args))
