@@ -20,24 +20,35 @@
 
 version = '1.0b2'
 
-import sys, os, typing, runpy, importlib, re, textwrap, inspect
+import sys
+import os
+import typing
+import runpy
+import importlib
+import re
+import textwrap
+import inspect
 from . import util, serializer, proto, error
 
 T = typing.TypeVar('T')
 
+
 def loads(t: typing.Type[T], s: str, *, pretty: bool = False) -> T:
-  if pretty:
-    s = util.deprettify(s)
-  return serializer.get(t).loads(s)
+    if pretty:
+        s = util.deprettify(s)
+    return serializer.get(t).loads(s)
+
 
 def dumps(t: typing.Type[T], v: T, *, pretty: bool = False) -> str:
-  s = serializer.get(t).dumps(v)
-  if pretty:
-    s = util.prettify(s)
-  return s
+    s = serializer.get(t).dumps(v)
+    if pretty:
+        s = util.prettify(s)
+    return s
+
 
 def load(t: typing.Type[T], f: proto.SupportsRead, *, pretty: bool = False) -> T:
-  return loads(t, f.read(), pretty=pretty)
+    return loads(t, f.read(), pretty=pretty)
+
 
 def dump(t: typing.Type[T], v: T, f: proto.SupportsWrite, *, pretty: bool = False) -> None:
-  f.write(dumps(t, v, pretty=pretty))
+    f.write(dumps(t, v, pretty=pretty))
