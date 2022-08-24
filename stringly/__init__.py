@@ -35,15 +35,8 @@ stringly representation to instantiate objects direcly from the command line.'''
 __version__ = '1.0b3'
 
 
-import sys
-import os
 import typing
-import runpy
-import importlib
-import re
-import textwrap
-import inspect
-from . import util, serializer, proto, error
+from . import util, serializer, proto
 
 T = typing.TypeVar('T')
 

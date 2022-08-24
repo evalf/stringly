@@ -1,13 +1,12 @@
-import typing
-from typing_extensions import get_origin as typing_get_origin, get_args as typing_get_args
+import collections
+import contextlib
+import dataclasses
 import decimal
 import enum
-import contextlib
 import inspect
-import sys
-import collections
 import itertools
-import dataclasses
+import typing
+from typing_extensions import get_origin as typing_get_origin, get_args as typing_get_args
 from . import proto, util, error
 
 T = typing.TypeVar('T')

@@ -1,7 +1,7 @@
-import typing
+import itertools
 import re
 import textwrap
-import itertools
+import typing
 from . import error
 
 

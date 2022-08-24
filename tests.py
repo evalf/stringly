@@ -1,11 +1,11 @@
-import stringly
-import unittest
-import typing
-import enum
+import dataclasses
 import decimal
+import enum
+import stringly
 import sys
 import textwrap
-import dataclasses
+import typing
+import unittest
 
 
 class Protect(unittest.TestCase):
