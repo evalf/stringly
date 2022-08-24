@@ -7,12 +7,8 @@ import inspect
 import sys
 import collections
 import itertools
+import dataclasses
 from . import proto, util, error
-
-if sys.version_info >= (3,7):
-    import dataclasses
-else:
-    dataclasses = None
 
 if sys.version_info >= (3,8):
     from typing import get_origin as typing_get_origin, get_args as typing_get_args
@@ -458,7 +454,7 @@ class Generic(typing.Generic[T]):
             elif hasattr(self.cls, '__getnewargs__'):
                 args = self.cls.__getnewargs__(v) # type: ignore
                 assert len(args) == len(self.argnames)
-            elif dataclasses and dataclasses.is_dataclass(self.cls):
+            elif dataclasses.is_dataclass(self.cls):
                 args = tuple(getattr(v, name) for name in self.argnames)
             else:
                 raise error.SerializationError('cannot dump {}'.format(v))

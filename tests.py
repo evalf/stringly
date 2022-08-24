@@ -5,11 +5,7 @@ import enum
 import decimal
 import sys
 import textwrap
-
-if sys.version_info >= (3,7):
-    import dataclasses
-else:
-    dataclasses = None
+import dataclasses
 
 
 class Protect(unittest.TestCase):
@@ -341,8 +337,6 @@ class Typing(unittest.TestCase):
         self.check(typing.Optional[int], None, '', 'typing.Optional[int]')
 
     def test_dataclass(self):
-        if not dataclasses:
-            self.skipTest('module dataclasses unavailable for python < 3.7')
         t = dataclasses.make_dataclass('t', [('a', int), ('b', str, dataclasses.field(default='2'))])
         self.check(t, t(a=1, b='2,3'), 'a=1,b={2,3}', 't')
         self.assertEqual(stringly.loads(t, 'a=1'), t(a=1))
