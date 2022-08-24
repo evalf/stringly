@@ -1,5 +1,5 @@
 import typing
-import typing_extensions
+from typing_extensions import get_origin as typing_get_origin, get_args as typing_get_args
 import decimal
 import enum
 import contextlib
@@ -9,33 +9,6 @@ import collections
 import itertools
 import dataclasses
 from . import proto, util, error
-
-if sys.version_info >= (3,8):
-    from typing import get_origin as typing_get_origin, get_args as typing_get_args
-else:
-    def typing_get_args(typ: typing.Any) -> typing.Tuple[typing.Any, ...]:
-        args = getattr(typ, '__args__', ())
-        if not isinstance(args, tuple):
-            raise ValueError('expected __args__ to be a tuple but got {!r}'.format(args))
-        return args
-    if sys.version_info >= (3,7):
-        def typing_get_origin(typ: typing.Any) -> typing.Optional[typing.Any]:
-            return getattr(typ, '__origin__', None)
-    else:
-        def typing_get_origin(typ: typing.Any) -> typing.Optional[typing.Any]:
-            origin = getattr(typ, '__origin__', None)
-            if origin is typing.Dict:
-                return dict
-            elif origin is typing.Tuple:
-                return tuple
-            elif origin is typing.List:
-                return list
-            elif origin is typing.Set:
-                return set
-            elif origin is typing.FrozenSet:
-                return frozenset
-            else:
-                return origin
 
 T = typing.TypeVar('T')
 K = typing.TypeVar('K')
