@@ -243,7 +243,7 @@ class Decimal(unittest.TestCase):
     def test_loads(self):
         self.assertEqual(stringly.loads(decimal.Decimal, '1.2'), decimal.Decimal('1.2'))
         with self.assertRaises(stringly.error.SerializationError):
-            stringly.loads(float, '1a')
+            stringly.loads(decimal.Decimal, '1a')
 
     def test_dumps(self):
         self.assertEqual(stringly.dumps(decimal.Decimal, decimal.Decimal('1.2')), '1.2')
