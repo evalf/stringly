@@ -65,7 +65,7 @@ def get(t: typing.Any) -> proto.Serializer[typing.Any]:
             nzserializers = tuple(map(get, nzargs))
             duplicate_nznames = [name for name, g in itertools.groupby(sorted(nznames)) if len(list(g)) > 1]
             if duplicate_nznames:
-                raise ValueError('duplicate names: {}'.format(', '.join(duplicate_nznames)))
+                raise ValueError(f'duplicate names: {", ".join(duplicate_nznames)}')
             if len(nzargs) == len(args):
                 return Union(collections.OrderedDict(zip(nznames, nzserializers)))
             elif len(nzargs) == 1:
@@ -77,7 +77,7 @@ def get(t: typing.Any) -> proto.Serializer[typing.Any]:
             return Sequence(get(args[0]), origin)
     if callable(t):
         return Generic(t)
-    raise ValueError('unsupported type: {}'.format(t))
+    raise ValueError(f'unsupported type: {t}')
 
 
 @contextlib.contextmanager
@@ -85,7 +85,7 @@ def loading(t: typing.Any, s: str, capture: typing.Type[Exception] = error.Seria
     try:
         yield
     except capture as e:
-        raise error.SerializationError('loading {!r} as {}'.format(s, t)) from e
+        raise error.SerializationError(f'loading {s!r} as {t}') from e
 
 
 @contextlib.contextmanager
@@ -93,7 +93,7 @@ def dumping(t: typing.Any, v: typing.Any, capture: typing.Type[Exception] = erro
     try:
         yield
     except capture as e:
-        raise error.SerializationError('dumping {!r} <{}> as {}'.format(v, type(v).__name__, t)) from e
+        raise error.SerializationError(f'dumping {v!r} <{type(v).__name__}> as {t}') from e
 
 
 class Custom(typing.Generic[T]):
@@ -220,7 +220,7 @@ class UniformTuple(typing.Generic[T]):
             return ','.join(util.protect_regex(self.itemserializer.dumps(vi), ',') or '{}' for vi in v)
 
     def __str__(self) -> str:
-        return 'typing.Tuple[{}, ...]'.format(self.itemserializer)
+        return f'typing.Tuple[{self.itemserializer}, ...]'
 
 
 class PluriformTuple:
@@ -241,7 +241,7 @@ class PluriformTuple:
             raise error.SerializationError('tuple has incorrect length')
 
     def __str__(self) -> str:
-        return 'typing.Tuple[{}]'.format(', '.join(map(str, self.itemserializers)))
+        return f'typing.Tuple[{", ".join(map(str, self.itemserializers))}]'
 
 
 class Dict(typing.Generic[K, V]):
@@ -265,7 +265,7 @@ class Dict(typing.Generic[K, V]):
             return ','.join(util.protect_regex(self.keyserializer.dumps(vk), ',|=') + '=' + util.protect_regex(self.valueserializer.dumps(vv), ',') for vk, vv in v.items())
 
     def __str__(self) -> str:
-        return 'typing.Dict[{}, {}]'.format(self.keyserializer, self.valueserializer)
+        return f'typing.Dict[{self.keyserializer}, {self.valueserializer}]'
 
 
 class Union:
@@ -276,7 +276,7 @@ class Union:
         with loading(self, s):
             name, value = util.splitarg(s)
             if name not in self.serializers:
-                raise error.SerializationError('unknown type: {}'.format(name))
+                raise error.SerializationError(f'unknown type: {name}')
             return self.serializers[name].loads(value)
 
     def dumps(self, v: typing.Any) -> str:
@@ -290,7 +290,7 @@ class Union:
             raise error.SerializationError('failed to find matching serializer')
 
     def __str__(self) -> str:
-        return 'typing.Union[{}]'.format(', '.join(map(str, self.serializers.values())))
+        return f'typing.Union[{", ".join(map(str, self.serializers.values()))}]'
 
 
 class Optional(typing.Generic[T]):
@@ -311,7 +311,7 @@ class Optional(typing.Generic[T]):
             return util.protect_unconditionally(s) if s.startswith('{') and s.endswith('}') or not s else s
 
     def __str__(self) -> str:
-        return 'typing.Optional[{}]'.format(self.serializer)
+        return f'typing.Optional[{self.serializer}]'
 
 
 class Sequence:
@@ -329,7 +329,7 @@ class Sequence:
 
     def __str__(self) -> str:
         typename = {list: 'typing.List', set: 'typing.Set', frozenset: 'typing.FrozenSet'}[self.origin]
-        return '{}[{}]'.format(typename, self.itemserializer)
+        return f'{typename}[{self.itemserializer}]'
 
 enumT = typing.TypeVar('enumT', bound=enum.Enum)
 
@@ -345,7 +345,7 @@ class Enum(typing.Generic[enumT]):
     def dumps(self, v: enumT) -> str:
         with dumping(self, v):
             if not isinstance(v, self.cls):
-                raise error.SerializationError('object is not an instance of type {}'.format(self.cls))
+                raise error.SerializationError(f'object is not an instance of type {self.cls}')
             return v.name
 
     def __str__(self) -> str:
@@ -378,7 +378,7 @@ class Generic(typing.Generic[T]):
             elif param.default is not param.empty:
                 T = type(param.default)
             else:
-                raise Exception('invalid function signature: type cannot be inferred for argument {!r}'.format(param.name))
+                raise Exception(f'invalid function signature: type cannot be inferred for argument {param.name!r}')
             self.serializers.append(get(T))
 
     def loads(self, s: str) -> T:
@@ -390,7 +390,7 @@ class Generic(typing.Generic[T]):
                 if not self.npositional:
                     parts = util.safesplit(s, '=', 1)
                     if len(parts) != 2 or parts[0] != self.argnames[0]:
-                        raise error.SerializationError('invalid argument {!r}'.format(parts[0])) from None
+                        raise error.SerializationError(f'invalid argument {parts[0]!r}') from None
                     s = parts[1]
                 args[0] = _strarg(util.unprotect(s))
             else:
@@ -402,7 +402,7 @@ class Generic(typing.Generic[T]):
                         try:
                             index = self.argnames.index(name, self.npositional)
                         except ValueError:
-                            raise error.SerializationError('invalid argument {!r}'.format(name)) from None
+                            raise error.SerializationError(f'invalid argument {name!r}') from None
                         args[index] = _strarg(value)
                     elif index < self.npositional:
                         args[index] = _strarg(util.unprotect(si))
@@ -411,7 +411,7 @@ class Generic(typing.Generic[T]):
                         raise error.SerializationError('invalid expression')
             for i, arg in enumerate(args):
                 if arg is inspect.Parameter.empty:
-                    raise error.SerializationError('missing mantatory argument {!r}'.format(self.argnames[i]))
+                    raise error.SerializationError(f'missing mantatory argument {self.argnames[i]!r}')
                 if isinstance(arg, _strarg):
                     args[i] = self.serializers[i].loads(arg.value)
             return self.cls(*args[:self.npositional], **dict(zip(self.argnames[self.npositional:], args[self.npositional:])))
@@ -419,7 +419,7 @@ class Generic(typing.Generic[T]):
     def dumps(self, v: T) -> str:
         with dumping(self.cls, v):
             if not isinstance(v, self.cls):
-                raise error.SerializationError('object is not an instance of type {}'.format(self.cls))
+                raise error.SerializationError(f'object is not an instance of type {self.cls}')
             if hasattr(self.cls, '__getnewargs_ex__'):
                 args, kwargs = self.cls.__getnewargs_ex__(v) # type: ignore
                 assert len(args) + len(kwargs) == len(self.argnames)
@@ -430,7 +430,7 @@ class Generic(typing.Generic[T]):
             elif dataclasses.is_dataclass(self.cls):
                 args = tuple(getattr(v, name) for name in self.argnames)
             else:
-                raise error.SerializationError('cannot dump {}'.format(v))
+                raise error.SerializationError(f'cannot dump {v}')
             dumps = [serializer.dumps(arg) for serializer, arg in zip(self.serializers, args)]
             if len(self.argnames) == 1:
                 return util.protect_unbalanced(dumps[0]) or '{}' if self.npositional \

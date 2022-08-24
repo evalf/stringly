@@ -71,7 +71,7 @@ def unprotect(s: str) -> str:
 def splitarg(s: str) -> typing.Tuple[str,str]:
     head, sep, tail = s.partition('{')
     if sep and not tail.endswith('}'):
-        raise Exception('invalid joined argument {!r}'.format(s))
+        raise Exception(f'invalid joined argument {s!r}')
     return head, unprotect(sep + tail)
 
 
@@ -115,7 +115,7 @@ def deprettify(pretty: str) -> str:
             indents = [indent]
         elif indent > indents[-1]:
             if indent - indents[-1] == 1:
-                raise ValueError('line {}: indentation should be two or more spaces but got one'.format(i+1))
+                raise ValueError(f'line {i+1}: indentation should be two or more spaces but got one')
             s += '{'
             indents.append(indent)
         else:
@@ -123,7 +123,7 @@ def deprettify(pretty: str) -> str:
                 indents.pop()
                 s += '}'
             if not indents or indent < indents[-1]:
-                raise ValueError('line {}: dedent does not match previous indentation'.format(i+1))
+                raise ValueError(f'line {i+1}: dedent does not match previous indentation')
             s += ','
         if line.startswith(' '*indent+'>|'):
             s += line[indent+2:]
@@ -175,7 +175,7 @@ class DocString:
             for si in safesplit(deprettify(body), ','):
                 parts = safesplit(si, '=', 1)
                 if len(parts) != 2:
-                    raise error.SerializationError('preset {!r} has not value for argument {!r}'.format(name, unprotect(si)))
+                    raise error.SerializationError(f'preset {name!r} has not value for argument {unprotect(si)!r}')
                 v[unprotect(parts[0])] = unprotect(parts[1])
             p[name] = v
         return p

@@ -454,9 +454,9 @@ class Typing(unittest.TestCase):
             @staticmethod
             def __stringly_dumps__(value):
                 if isinstance(value, int):
-                    return 'int{{{}}}'.format(value)
+                    return f'int{{{value}}}'
                 elif isinstance(value, str):
-                    return 'str{{{}}}'.format(value)
+                    return f'str{{{value}}}'
                 else:
                     raise ValueError('unsupported type')
         self.check(Custom, '1', 'str{1}', 'Custom')
