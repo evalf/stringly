@@ -18,7 +18,22 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-version = '1.0b2'
+'''Stringly: Human Readable Object Serialization
+
+Stringly aims to facilitate foreign function calls into Python by providing
+human readable serialization and de-serialization of arbitrary Python objects.
+
+Stringly is similar to Python's pickle protocol in that the serialized form
+follows directly from class introspection. This as opposed to serialization
+technologies such as JSON and YAML, which are self contained but support only a
+predefined set of data types. Similar to those technologies, however, and
+unlike pickle, the resulting strings are human readible and human writable.
+
+A typical use case of stringly is as part of a command line parser, using the
+stringly representation to instantiate objects direcly from the command line.'''
+
+__version__ = '1.0b3'
+
 
 import sys
 import os
