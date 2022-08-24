@@ -8,7 +8,7 @@ from . import error
 def safesplit(s: str, sep: str, maxsplit: int = -1) -> typing.List[str]:
     if not s:
         return []
-    parts = [] # type: typing.List[str]
+    parts: typing.List[str] = []
     level = 0
     for part in s.split(sep):
         if level or maxsplit >= 0 and len(parts) > maxsplit:
@@ -139,8 +139,9 @@ def deprettify(pretty: str) -> str:
 
 
 class DocString:
-    directives = re.compile(r'^[.][.] (arguments|presets)::\n(.*?)(?:\n(?!(?:   | *\n))|\Z)', flags=re.MULTILINE|re.DOTALL) # type: typing.ClassVar[typing.Pattern[str]]
-    noindent = re.compile(r'\n(?=\S)') # type: typing.ClassVar[typing.Pattern[str]]
+
+    directives: typing.ClassVar[typing.Pattern[str]] = re.compile(r'^[.][.] (arguments|presets)::\n(.*?)(?:\n(?!(?:   | *\n))|\Z)', flags=re.MULTILINE | re.DOTALL)
+    noindent: typing.ClassVar[typing.Pattern[str]] = re.compile(r'\n(?=\S)')
 
     def __init__(self, f: typing.Callable[..., typing.Any]) -> None:
         head, sep, tail = (f.__doc__ or '').partition('\n')
@@ -168,9 +169,9 @@ class DocString:
 
     @property
     def presets(self) -> typing.Mapping[str, typing.Mapping[str, str]]:
-        p = {} # type: typing.Dict[str, typing.Mapping[str, str]]
+        p: typing.Dict[str, typing.Mapping[str, str]] = {}
         for name, body in self._directive('presets'):
-            v = {} # type: typing.Dict[str, str]
+            v: typing.Dict[str, str] = {}
             for si in safesplit(deprettify(body), ','):
                 parts = safesplit(si, '=', 1)
                 if len(parts) != 2:

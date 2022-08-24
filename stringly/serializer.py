@@ -251,7 +251,7 @@ class Dict(typing.Generic[K, V]):
 
     def loads(self, s: str) -> typing.Dict[K, V]:
         with loading(self, s):
-            v = {} # type: typing.Dict[K, V]
+            v: typing.Dict[K, V] = {}
             for si in util.safesplit(s, ','):
                 parts = util.safesplit(si, '=', 1)
                 if len(parts) != 2:
@@ -365,7 +365,7 @@ class Generic(typing.Generic[T]):
         self.argnames = tuple(params)
         self.defaults = [_strarg(defaults[name]) if name in defaults else params[name].default for name in self.argnames]
         self.npositional = 0
-        self.serializers = [] # type: typing.List[proto.Serializer[T]]
+        self.serializers: typing.List[proto.Serializer[T]] = []
         for param in params.values():
             if param.kind is param.POSITIONAL_ONLY:
                 if self.npositional < len(self.serializers):
