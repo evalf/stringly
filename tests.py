@@ -1,6 +1,7 @@
 import dataclasses
 import decimal
 import enum
+import pathlib
 import stringly
 import sys
 import textwrap
@@ -236,6 +237,24 @@ class Complex(unittest.TestCase):
         s = stringly.serializer.get(complex)
         self.assertIsInstance(s, stringly.serializer.Native)
         self.assertEqual(str(s), 'complex')
+
+
+class Path(unittest.TestCase):
+
+    def test_loads(self):
+        self.assertEqual(stringly.loads(
+            pathlib.Path, '/foo/bar'), pathlib.Path('/foo/bar'))
+
+    def test_dumps(self):
+        self.assertEqual(stringly.dumps(
+            pathlib.Path, pathlib.Path('/foo/bar')), '/foo/bar')
+        with self.assertRaisesRegex(stringly.error.SerializationError, '1.2 <float> is not an instance of Path'):
+            stringly.dumps(pathlib.Path, 1.2)
+
+    def test_serializer(self):
+        s = stringly.serializer.get(pathlib.Path)
+        self.assertIsInstance(s, stringly.serializer.Native)
+        self.assertEqual(str(s), 'Path')
 
 
 class Decimal(unittest.TestCase):

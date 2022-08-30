@@ -5,6 +5,7 @@ import decimal
 import enum
 import inspect
 import itertools
+import pathlib
 import typing
 from typing_extensions import get_origin as typing_get_origin, get_args as typing_get_args
 from . import proto, util, error
@@ -32,7 +33,7 @@ def get(t: typing.Any) -> proto.Serializer[typing.Any]:
             return Native(t, alt=(int, bool), trim=(('', '.0'),))
         if t is complex:
             return Native(t, alt=(float, int, bool), trim=(('(', ')'), ('', '+0j')))
-        if t in (str, decimal.Decimal):
+        if t in (str, decimal.Decimal, pathlib.Path):
             return Native(t)
         if issubclass(t, enum.Enum):
             return Enum(t)
