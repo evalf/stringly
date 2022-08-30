@@ -170,11 +170,11 @@ class Int(unittest.TestCase):
         self.assertEqual(stringly.dumps(int, 1), '1')
 
     def test_dumps_float(self):
-        with self.assertRaisesRegex(stringly.error.SerializationError, 'dumping 1.0 <float> as int'):
+        with self.assertRaisesRegex(stringly.error.SerializationError, '1.0 <float> is not an instance of int or bool'):
             stringly.dumps(int, 1.0)
 
     def test_dumps_complex(self):
-        with self.assertRaisesRegex(stringly.error.SerializationError, 'dumping 1j <complex> as int'):
+        with self.assertRaisesRegex(stringly.error.SerializationError, '1j <complex> is not an instance of int or bool'):
             stringly.dumps(int, 1j)
 
     def test_serializer(self):
@@ -202,7 +202,7 @@ class Float(unittest.TestCase):
         self.assertEqual(stringly.dumps(float, 0.2), '0.2')
 
     def test_dumps_complex(self):
-        with self.assertRaisesRegex(stringly.error.SerializationError, 'dumping 1j <complex> as float'):
+        with self.assertRaisesRegex(stringly.error.SerializationError, '1j <complex> is not an instance of float or int or bool'):
             stringly.dumps(float, 1j)
 
     def test_serializer(self):
@@ -247,7 +247,7 @@ class Decimal(unittest.TestCase):
 
     def test_dumps(self):
         self.assertEqual(stringly.dumps(decimal.Decimal, decimal.Decimal('1.2')), '1.2')
-        with self.assertRaisesRegex(stringly.error.SerializationError, 'dumping 1.2 <float> as Decimal'):
+        with self.assertRaisesRegex(stringly.error.SerializationError, '1.2 <float> is not an instance of Decimal'):
             stringly.dumps(decimal.Decimal, 1.2)
 
     def test_serializer(self):
