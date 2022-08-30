@@ -24,18 +24,16 @@ def get(t: typing.Any) -> proto.Serializer[typing.Any]:
     if hasattr(t, '__stringly_loads__') and hasattr(t, '__stringly_dumps__'):
         return Custom(t)
     if isinstance(t, type):
-        if issubclass(t, bool):
+        if t is bool:
             return Boolean()
-        if issubclass(t, int):
-            return Int()
-        if issubclass(t, float):
-            return Float()
-        if issubclass(t, complex):
-            return Complex()
-        if issubclass(t, str):
-            return String()
-        if issubclass(t, decimal.Decimal):
-            return Decimal()
+        if t is int:
+            return Native(t, alt=(bool,))
+        if t is float:
+            return Native(t, alt=(int, bool), trim=(('', '.0'),))
+        if t is complex:
+            return Native(t, alt=(float, int, bool), trim=(('(', ')'), ('', '+0j')))
+        if t in (str, decimal.Decimal):
+            return Native(t)
         if issubclass(t, enum.Enum):
             return Enum(t)
         if t is tuple:
@@ -129,80 +127,29 @@ class Boolean:
         return 'bool'
 
 
-class Int:
+class Native:
+    def __init__(self, T, alt=(), trim=()):
+        self.T = T
+        self.alt = alt
+        self.trim = trim
+
     def loads(self, s: str) -> int:
-        with loading('int', s, capture=ValueError):
-            return int(s)
+        with loading(self, s, capture=Exception):
+            return self.T(s)
 
-    def dumps(self, v: int) -> str:
-        with dumping('int', v):
-            if not isinstance(v, (bool, int)):
-                raise error.SerializationError('object is not an instance of int or bool')
-            return str(int(v))
+    def dumps(self, v):
+        with dumping(self, v):
+            types = self.T, *self.alt
+            if not isinstance(v, types):
+                raise error.SerializationError(f'object is not an instance of type {" or ".join(T.__name__ for T in types)}')
+            s = str(self.T(v))
+            for prefix, suffix in self.trim:
+                if s.startswith(prefix) and s.endswith(suffix):
+                    s = s[len(prefix):len(s)-len(suffix)]
+            return s
 
-    def __str__(self) -> str:
-        return 'int'
-
-
-class Float:
-    def loads(self, s: str) -> float:
-        with loading('float', s, capture=ValueError):
-            return float(s)
-
-    def dumps(self, v: float) -> str:
-        with dumping('float', v):
-            if not isinstance(v, (bool, int, float)):
-                raise error.SerializationError('object is not an instance of float, int or bool')
-            s = str(float(v))
-            return s[:-2] if s.endswith('.0') else s
-
-    def __str__(self) -> str:
-        return 'float'
-
-
-class Complex:
-    def loads(self, s: str) -> complex:
-        with loading('complex', s, capture=ValueError):
-            return complex(s)
-
-    def dumps(self, v: complex) -> str:
-        with dumping('complex', v):
-            if not isinstance(v, (bool, int, float, complex)):
-                raise error.SerializationError('object is not an instance of complex, float, int or bool')
-            s = str(complex(v)).lstrip('(').rstrip(')')
-            return s[:-3] if s.endswith('+0j') else s[2:] if s.startswith('0+') else s
-
-    def __str__(self) -> str:
-        return 'complex'
-
-
-class String:
-    def loads(self, s: str) -> str:
-        return s
-
-    def dumps(self, v: str) -> str:
-        with dumping('str', v):
-            if not isinstance(v, str):
-                raise error.SerializationError('object is not an instance of str')
-            return v
-
-    def __str__(self) -> str:
-        return 'str'
-
-
-class Decimal:
-    def loads(self, s: str) -> decimal.Decimal:
-        with loading('decimal.Decimal', s, capture=Exception):
-            return decimal.Decimal(s)
-
-    def dumps(self, v: decimal.Decimal) -> str:
-        with dumping('decimal.Decimal', v):
-            if not isinstance(v, decimal.Decimal):
-                raise error.SerializationError('object is not an instance of Decimal')
-            return str(v)
-
-    def __str__(self) -> str:
-        return 'decimal.Decimal'
+    def __str__(self):
+        return self.T.__qualname__
 
 
 class UniformTuple(typing.Generic[T]):

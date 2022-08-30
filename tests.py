@@ -179,7 +179,7 @@ class Int(unittest.TestCase):
 
     def test_serializer(self):
         s = stringly.serializer.get(int)
-        self.assertIsInstance(s, stringly.serializer.Int)
+        self.assertIsInstance(s, stringly.serializer.Native)
         self.assertEqual(str(s), 'int')
 
 
@@ -207,7 +207,7 @@ class Float(unittest.TestCase):
 
     def test_serializer(self):
         s = stringly.serializer.get(float)
-        self.assertIsInstance(s, stringly.serializer.Float)
+        self.assertIsInstance(s, stringly.serializer.Native)
         self.assertEqual(str(s), 'float')
 
 
@@ -234,7 +234,7 @@ class Complex(unittest.TestCase):
 
     def test_serializer(self):
         s = stringly.serializer.get(complex)
-        self.assertIsInstance(s, stringly.serializer.Complex)
+        self.assertIsInstance(s, stringly.serializer.Native)
         self.assertEqual(str(s), 'complex')
 
 
@@ -247,13 +247,13 @@ class Decimal(unittest.TestCase):
 
     def test_dumps(self):
         self.assertEqual(stringly.dumps(decimal.Decimal, decimal.Decimal('1.2')), '1.2')
-        with self.assertRaisesRegex(stringly.error.SerializationError, 'dumping 1.2 <float> as decimal.Decimal'):
+        with self.assertRaisesRegex(stringly.error.SerializationError, 'dumping 1.2 <float> as Decimal'):
             stringly.dumps(decimal.Decimal, 1.2)
 
     def test_serializer(self):
         s = stringly.serializer.get(decimal.Decimal)
-        self.assertIsInstance(s, stringly.serializer.Decimal)
-        self.assertEqual(str(s), 'decimal.Decimal')
+        self.assertIsInstance(s, stringly.serializer.Native)
+        self.assertEqual(str(s), 'Decimal')
 
 
 class Typing(unittest.TestCase):
