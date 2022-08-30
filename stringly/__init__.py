@@ -18,26 +18,45 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-version = '1.0b2'
+'''Stringly: Human Readable Object Serialization
 
-import sys, os, typing, runpy, importlib, re, textwrap, inspect
-from . import util, serializer, proto, error
+Stringly aims to facilitate foreign function calls into Python by providing
+human readable serialization and de-serialization of arbitrary Python objects.
+
+Stringly is similar to Python's pickle protocol in that the serialized form
+follows directly from class introspection. This as opposed to serialization
+technologies such as JSON and YAML, which are self contained but support only a
+predefined set of data types. Similar to those technologies, however, and
+unlike pickle, the resulting strings are human readible and human writable.
+
+A typical use case of stringly is as part of a command line parser, using the
+stringly representation to instantiate objects direcly from the command line.'''
+
+__version__ = '1.0b3'
+
+
+import typing
+from . import util, serializer, proto
 
 T = typing.TypeVar('T')
 
+
 def loads(t: typing.Type[T], s: str, *, pretty: bool = False) -> T:
-  if pretty:
-    s = util.deprettify(s)
-  return serializer.get(t).loads(s)
+    if pretty:
+        s = util.deprettify(s)
+    return serializer.get(t).loads(s)
+
 
 def dumps(t: typing.Type[T], v: T, *, pretty: bool = False) -> str:
-  s = serializer.get(t).dumps(v)
-  if pretty:
-    s = util.prettify(s)
-  return s
+    s = serializer.get(t).dumps(v)
+    if pretty:
+        s = util.prettify(s)
+    return s
+
 
 def load(t: typing.Type[T], f: proto.SupportsRead, *, pretty: bool = False) -> T:
-  return loads(t, f.read(), pretty=pretty)
+    return loads(t, f.read(), pretty=pretty)
+
 
 def dump(t: typing.Type[T], v: T, f: proto.SupportsWrite, *, pretty: bool = False) -> None:
-  f.write(dumps(t, v, pretty=pretty))
+    f.write(dumps(t, v, pretty=pretty))
