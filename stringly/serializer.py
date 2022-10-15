@@ -305,7 +305,7 @@ class Generic(typing.Generic[T]):
             if not self.npositional:
                 parts = util.safesplit(s, '=', 1)
                 if len(parts) != 2 or parts[0] != self.argnames[0]:
-                    raise error.SerializationError(f'invalid argument {parts[0]!r}') from None
+                    raise error.SerializationError(f'invalid argument for {self.cls.__name__}: {s}') from None
                 s = parts[1]
             args[0] = _strarg(util.unprotect(s))
         else:
