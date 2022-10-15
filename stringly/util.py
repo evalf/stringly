@@ -134,7 +134,8 @@ def deprettify(pretty: str) -> str:
         else:
             s += line[indent:]
             i += 1
-    s += '}'*(len(indents)-1)
+    if s:
+        s += '}'*(len(indents)-1)
     return s
 
 
